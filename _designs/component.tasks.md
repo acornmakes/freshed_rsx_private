@@ -80,14 +80,14 @@ Files:
 
 Tasks:
 
-- [ ] 3.1 Add compile mode enum:
+- [x] 3.1 Add compile mode enum:
   - SyncNoCtx
   - AsyncNoCtx
   - SyncWithCtx
   - AsyncWithCtx
-- [ ] 3.2 Extend current output IR to store expression fragments without losing existing format strategy.
-- [ ] 3.3 Thread compile mode through all visitor/codegen paths.
-- [ ] 3.4 Ensure no behavior change for intrinsic-only trees in SyncNoCtx mode.
+- [x] 3.2 Extend current output IR to store expression fragments without losing existing format strategy.
+- [x] 3.3 Thread compile mode through all visitor/codegen paths.
+- [x] 3.4 Ensure no behavior change for intrinsic-only trees in SyncNoCtx mode.
 
 Exit criteria:
 
@@ -101,10 +101,10 @@ Files:
 
 Tasks:
 
-- [ ] 4.1 Implement `is_component_tag(NodeName) -> bool` using design rules.
-- [ ] 4.2 Implement component path extraction preserving source spans.
-- [ ] 4.3 Implement props type inference (`Foo` -> `FooProps`, `ui::Foo` -> `ui::FooProps`).
-- [ ] 4.4 Keep intrinsic branch untouched for lowercase/html/custom-element tags.
+- [x] 4.1 Implement `is_component_tag(NodeName) -> bool` using design rules.
+- [x] 4.2 Implement component path extraction preserving source spans.
+- [x] 4.3 Implement props type inference (`Foo` -> `FooProps`, `ui::Foo` -> `ui::FooProps`).
+- [x] 4.4 Keep intrinsic branch untouched for lowercase/html/custom-element tags.
 
 Exit criteria:
 

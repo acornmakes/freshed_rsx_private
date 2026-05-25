@@ -1,4 +1,4 @@
-use freshed_rs_macros::html_ctx;
+use freshed_rs_macros::{component, html_ctx};
 
 #[derive(Clone, Copy)]
 struct Ctx;
@@ -8,8 +8,8 @@ pub struct UserCardProps {
     pub children: String,
 }
 
-#[allow(non_snake_case)]
-pub fn UserCard(_ctx: Ctx, props: UserCardProps) -> String {
+#[component]
+pub fn user_card(_ctx: Ctx, props: UserCardProps) -> String {
     format!("<UserCard>{}</UserCard>", props.children)
 }
 

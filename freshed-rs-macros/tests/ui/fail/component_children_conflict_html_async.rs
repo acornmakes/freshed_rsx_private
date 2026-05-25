@@ -1,12 +1,12 @@
-use freshed_rs_macros::html_async;
+use freshed_rs_macros::{component, html_async};
 
 #[derive(Default)]
 pub struct PanelProps {
     pub children: &'static str,
 }
 
-#[allow(non_snake_case)]
-pub fn Panel(_props: PanelProps) -> String {
+#[component]
+pub fn panel(_props: PanelProps) -> String {
     String::new()
 }
 

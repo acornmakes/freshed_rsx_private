@@ -1,5 +1,5 @@
 error: async component marker is only supported in html_async! and html_async_ctx!
-  --> tests/ui/fail/async_marker_in_html_ctx.rs:18:37
+  --> tests/ui/fail/async_marker_in_html_in.rs:18:38
    |
 18 |     let _ = html_ctx!(ctx, <UserCard async>{"x"}</UserCard>);
-   |                                     ^^^^^
+   |                                      ^^^^^

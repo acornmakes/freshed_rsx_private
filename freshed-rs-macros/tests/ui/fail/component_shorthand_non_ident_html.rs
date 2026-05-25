@@ -1,10 +1,10 @@
-use freshed_rs_macros::html;
+use freshed_rs_macros::{component, html};
 
 #[derive(Default)]
 pub struct ButtonProps {}
 
-#[allow(non_snake_case)]
-pub fn Button(_props: ButtonProps) -> String {
+#[component]
+pub fn button(_props: ButtonProps) -> String {
     String::new()
 }
 

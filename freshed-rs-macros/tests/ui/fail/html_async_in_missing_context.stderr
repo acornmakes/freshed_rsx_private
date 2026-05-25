@@ -1,7 +1,7 @@
 error: html_async_ctx! expects input in the form: context_expr, <markup...>
- --> tests/ui/fail/html_async_ctx_missing_context.rs:4:13
+ --> tests/ui/fail/html_async_in_missing_context.rs:4:13
   |
 4 |     let _ = html_async_ctx!(<div>oops</div>);
-  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
   = note: this error originates in the macro `html_async_ctx` (in Nightly builds, run with -Z macro-backtrace for more info)

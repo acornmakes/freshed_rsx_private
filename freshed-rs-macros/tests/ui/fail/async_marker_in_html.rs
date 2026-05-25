@@ -1,12 +1,12 @@
-use freshed_rs_macros::html;
+use freshed_rs_macros::{component, html};
 
 #[derive(Default)]
 pub struct UserCardProps {
     pub children: String,
 }
 
-#[allow(non_snake_case)]
-pub fn UserCard(props: UserCardProps) -> String {
+#[component]
+pub fn user_card(props: UserCardProps) -> String {
     format!("<UserCard>{}</UserCard>", props.children)
 }
 

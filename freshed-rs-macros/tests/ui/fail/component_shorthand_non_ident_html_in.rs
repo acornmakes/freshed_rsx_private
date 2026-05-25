@@ -1,10 +1,10 @@
-use freshed_rs_macros::html_ctx;
+use freshed_rs_macros::{component, html_ctx};
 
 #[derive(Default)]
 pub struct ButtonProps {}
 
-#[allow(non_snake_case)]
-pub fn Button(_ctx: i32, _props: ButtonProps) -> String {
+#[component]
+pub fn button(_ctx: i32, _props: ButtonProps) -> String {
     String::new()
 }
 

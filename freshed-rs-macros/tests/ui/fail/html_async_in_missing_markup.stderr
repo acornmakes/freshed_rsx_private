@@ -1,7 +1,7 @@
 error: html_async_ctx! is missing markup after the context argument
- --> tests/ui/fail/html_async_ctx_missing_markup.rs:5:13
+ --> tests/ui/fail/html_async_in_missing_markup.rs:5:13
   |
 5 |     let _ = html_async_ctx!(ctx,);
-  |             ^^^^^^^^^^^^^^^^^^^^
+  |             ^^^^^^^^^^^^^^^^^^^^^
   |
   = note: this error originates in the macro `html_async_ctx` (in Nightly builds, run with -Z macro-backtrace for more info)

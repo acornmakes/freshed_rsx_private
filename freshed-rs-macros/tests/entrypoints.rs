@@ -1,4 +1,5 @@
 use freshed_rs_macros::{html, html_async, html_async_in, html_ide, html_in};
+use futures::executor::block_on;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub mod docs {
@@ -30,7 +31,10 @@ pub struct PanelProps {
 
 #[allow(non_snake_case)]
 pub fn Panel(props: PanelProps) -> String {
-    format!("<Panel title=\"{}\">{}</Panel>", props.title, props.children)
+    format!(
+        "<Panel title=\"{}\">{}</Panel>",
+        props.title, props.children
+    )
 }
 
 pub struct FancyButtonProps {
@@ -213,7 +217,10 @@ pub struct EvalLeafProps {
 
 #[allow(non_snake_case)]
 pub fn EvalLeaf(ctx: EvalCtx, props: EvalLeafProps) -> String {
-    format!("<EvalLeaf value=\"{}\">{}</EvalLeaf>", ctx.value, props.children)
+    format!(
+        "<EvalLeaf value=\"{}\">{}</EvalLeaf>",
+        ctx.value, props.children
+    )
 }
 
 pub struct EvalWrapperProps {
@@ -225,6 +232,66 @@ pub fn EvalWrapper(ctx: EvalCtx, props: EvalWrapperProps) -> String {
     format!(
         "<EvalWrapper value=\"{}\">{}</EvalWrapper>",
         ctx.value, props.children
+    )
+}
+
+static RENDER_SEQUENCE: AtomicUsize = AtomicUsize::new(0);
+
+pub struct SeqSyncProps {
+    pub label: &'static str,
+    pub children: String,
+}
+
+#[allow(non_snake_case)]
+pub fn SeqSync(props: SeqSyncProps) -> String {
+    let order = RENDER_SEQUENCE.fetch_add(1, Ordering::SeqCst);
+    format!(
+        "<SeqSync label=\"{}\" order=\"{}\">{}</SeqSync>",
+        props.label, order, props.children
+    )
+}
+
+pub struct SeqAsyncProps {
+    pub label: &'static str,
+    pub children: String,
+}
+
+#[allow(non_snake_case)]
+pub async fn SeqAsync(props: SeqAsyncProps) -> String {
+    let () = async {}.await;
+    let order = RENDER_SEQUENCE.fetch_add(1, Ordering::SeqCst);
+    format!(
+        "<SeqAsync label=\"{}\" order=\"{}\">{}</SeqAsync>",
+        props.label, order, props.children
+    )
+}
+
+pub struct CtxSeqSyncProps {
+    pub label: &'static str,
+    pub children: String,
+}
+
+#[allow(non_snake_case)]
+pub fn CtxSeqSync(ctx: RenderCtx, props: CtxSeqSyncProps) -> String {
+    let order = RENDER_SEQUENCE.fetch_add(1, Ordering::SeqCst);
+    format!(
+        "<CtxSeqSync tenant=\"{}\" label=\"{}\" order=\"{}\">{}</CtxSeqSync>",
+        ctx.tenant, props.label, order, props.children
+    )
+}
+
+pub struct CtxSeqAsyncProps {
+    pub label: &'static str,
+    pub children: String,
+}
+
+#[allow(non_snake_case)]
+pub async fn CtxSeqAsync(ctx: RenderCtx, props: CtxSeqAsyncProps) -> String {
+    let () = async {}.await;
+    let order = RENDER_SEQUENCE.fetch_add(1, Ordering::SeqCst);
+    format!(
+        "<CtxSeqAsync request-id=\"{}\" label=\"{}\" order=\"{}\">{}</CtxSeqAsync>",
+        ctx.request_id, props.label, order, props.children
     )
 }
 
@@ -276,7 +343,7 @@ fn html_ide_handles_document_like_markup() {
 
 #[test]
 fn html_async_currently_matches_sync_render_shape() {
-    let rendered = html_async!(<div>{"async-shape"}</div>).to_string();
+    let rendered = block_on(html_async!(<div>{"async-shape"}</div>)).to_string();
     assert_eq!(rendered, "<div>async-shape</div>");
 }
 
@@ -284,9 +351,10 @@ fn html_async_currently_matches_sync_render_shape() {
 fn html_async_handles_dynamic_attributes_and_children() {
     let user_id = 42;
     let username = "alice";
-    let rendered =
-        html_async!(<article data-user-id={user_id}><strong>{username}</strong></article>)
-            .to_string();
+    let rendered = block_on(
+        html_async!(<article data-user-id={user_id}><strong>{username}</strong></article>),
+    )
+    .to_string();
 
     assert_eq!(
         rendered,
@@ -311,14 +379,15 @@ fn html_in_accepts_complex_context_expression() {
 #[test]
 fn html_async_in_accepts_context_argument_shape() {
     let _ctx = "request-context";
-    let rendered = html_async_in!(_ctx, <div>{"ctx-async-shape"}</div>).to_string();
+    let rendered = block_on(html_async_in!(_ctx, <div>{"ctx-async-shape"}</div>)).to_string();
     assert_eq!(rendered, "<div>ctx-async-shape</div>");
 }
 
 #[test]
 fn html_async_in_accepts_complex_context_expression() {
     let _ctx = ("session", 11usize);
-    let rendered = html_async_in!(Some(&_ctx), <table><tr><td>{"ok"}</td></tr></table>).to_string();
+    let rendered =
+        block_on(html_async_in!(Some(&_ctx), <table><tr><td>{"ok"}</td></tr></table>)).to_string();
     assert_eq!(rendered, "<table><tr><td>ok</td></tr></table>");
 }
 
@@ -341,12 +410,12 @@ fn intrinsic_output_is_consistent_across_no_ctx_macro_modes() {
         </section>
     )
     .to_string();
-    let c = html_async!(
+    let c = block_on(html_async!(
         <section data-count={count}>
             <h2>{headline}</h2>
             <p>{"Stable"}</p>
         </section>
-    )
+    ))
     .to_string();
 
     assert_eq!(a, b);
@@ -365,13 +434,13 @@ fn intrinsic_output_is_consistent_across_ctx_macro_modes() {
         </nav>
     )
     .to_string();
-    let async_ctx = html_async_in!(
+    let async_ctx = block_on(html_async_in!(
         &_ctx,
         <nav>
             <a href={"/"}>{"home"}</a>
             <a href={"/about"}>{"about"}</a>
         </nav>
-    )
+    ))
     .to_string();
 
     assert_eq!(
@@ -389,8 +458,7 @@ fn html_renders_component_like_uppercase_tag_shape() {
 
 #[test]
 fn html_ide_renders_component_like_path_tag_shape() {
-    let rendered = html_ide!(<ui::Button data_kind={"secondary"}>{"Open"}</ui::Button>)
-        .to_string();
+    let rendered = html_ide!(<ui::Button data_kind={"secondary"}>{"Open"}</ui::Button>).to_string();
     assert_eq!(
         rendered,
         "<ui::Button data-kind=\"secondary\">Open</ui::Button>"
@@ -399,7 +467,7 @@ fn html_ide_renders_component_like_path_tag_shape() {
 
 #[test]
 fn html_async_renders_component_like_uppercase_tag_shape() {
-    let rendered = html_async!(<Card><h3>{"Title"}</h3></Card>).to_string();
+    let rendered = block_on(html_async!(<Card><h3>{"Title"}</h3></Card>)).to_string();
     assert_eq!(rendered, "<Card><h3>Title</h3></Card>");
 }
 
@@ -422,9 +490,10 @@ fn html_async_in_renders_component_like_path_tag_shape_with_context() {
         request_id: "req-22",
         tenant: "tenant-a",
     };
-    let rendered =
-        html_async_in!(ctx, <dashboard_ctx::Panel><span>{"ok"}</span></dashboard_ctx::Panel>)
-            .to_string();
+    let rendered = block_on(
+        html_async_in!(ctx, <dashboard_ctx::Panel><span>{"ok"}</span></dashboard_ctx::Panel>),
+    )
+    .to_string();
     assert_eq!(
         rendered,
         "<dashboard_ctx::Panel request-id=\"req-22\"><span>ok</span></dashboard_ctx::Panel>"
@@ -437,9 +506,10 @@ fn intrinsic_custom_element_branch_remains_unchanged_across_macro_families() {
 
     let a = html!(<my-widget data-ready={true}>{"x"}</my-widget>).to_string();
     let b = html_ide!(<my-widget data-ready={true}>{"x"}</my-widget>).to_string();
-    let c = html_async!(<my-widget data-ready={true}>{"x"}</my-widget>).to_string();
+    let c = block_on(html_async!(<my-widget data-ready={true}>{"x"}</my-widget>)).to_string();
     let d = html_in!(_ctx, <my-widget data-ready={true}>{"x"}</my-widget>).to_string();
-    let e = html_async_in!(_ctx, <my-widget data-ready={true}>{"x"}</my-widget>).to_string();
+    let e =
+        block_on(html_async_in!(_ctx, <my-widget data-ready={true}>{"x"}</my-widget>)).to_string();
 
     assert_eq!(a, "<my-widget data-ready=\"true\">x</my-widget>");
     assert_eq!(a, b);
@@ -452,8 +522,8 @@ fn intrinsic_custom_element_branch_remains_unchanged_across_macro_families() {
 fn html_component_props_support_literal_expr_and_shorthand_shapes() {
     let tone = "Launch";
     let rank = 2_i32;
-    let rendered = html!(<FancyButton label="Save" rank={rank} {tone}>{"ok"}</FancyButton>)
-        .to_string();
+    let rendered =
+        html!(<FancyButton label="Save" rank={rank} {tone}>{"ok"}</FancyButton>).to_string();
     assert_eq!(
         rendered,
         "<FancyButton label=\"Save\" rank=\"2\" tone=\"Launch\">ok</FancyButton>"
@@ -471,9 +541,10 @@ fn html_ide_component_props_support_children_named_property() {
 fn html_async_component_props_support_literal_expr_and_shorthand_shapes() {
     let action = "Open";
     let count = 3_i32;
-    let rendered =
-        html_async!(<ActionButton count={count} kind="primary" {action}>{"run"}</ActionButton>)
-            .to_string();
+    let rendered = block_on(
+        html_async!(<ActionButton count={count} kind="primary" {action}>{"run"}</ActionButton>),
+    )
+    .to_string();
     assert_eq!(
         rendered,
         "<ActionButton count=\"3\" kind=\"primary\" action=\"Open\">run</ActionButton>"
@@ -505,10 +576,10 @@ fn html_async_in_component_props_support_literal_expr_and_shorthand_shapes() {
     };
     let badge = "admin";
     let level = 5_i32;
-    let rendered = html_async_in!(
+    let rendered = block_on(html_async_in!(
         ctx,
         <CtxAuthBadge role="owner" level={level} {badge}>{"ok"}</CtxAuthBadge>
-    )
+    ))
     .to_string();
     assert_eq!(
         rendered,
@@ -530,7 +601,7 @@ fn html_injects_children_markup_when_component_has_body() {
 
 #[test]
 fn html_async_injects_children_markup_when_component_has_body() {
-    let rendered = html_async!(<Card><strong>{"nested"}</strong></Card>).to_string();
+    let rendered = block_on(html_async!(<Card><strong>{"nested"}</strong></Card>)).to_string();
     assert_eq!(rendered, "<Card><strong>nested</strong></Card>");
 }
 
@@ -542,7 +613,8 @@ fn html_in_and_html_async_in_inject_children_markup_when_component_has_body() {
     };
 
     let rendered_sync = html_in!(ctx, <CtxCard><em>{"sync"}</em></CtxCard>).to_string();
-    let rendered_async = html_async_in!(ctx, <CtxCard><em>{"sync"}</em></CtxCard>).to_string();
+    let rendered_async =
+        block_on(html_async_in!(ctx, <CtxCard><em>{"sync"}</em></CtxCard>)).to_string();
 
     assert_eq!(
         rendered_sync,
@@ -566,9 +638,9 @@ fn component_children_defaulting_is_consistent_across_all_macro_families() {
 
     let a = html!(<Card></Card>).to_string();
     let b = html_ide!(<Card></Card>).to_string();
-    let c = html_async!(<Card></Card>).to_string();
+    let c = block_on(html_async!(<Card></Card>)).to_string();
     let d = html_in!(ctx, <CtxCard></CtxCard>).to_string();
-    let e = html_async_in!(ctx, <CtxCard></CtxCard>).to_string();
+    let e = block_on(html_async_in!(ctx, <CtxCard></CtxCard>)).to_string();
 
     assert_eq!(a, "<Card></Card>");
     assert_eq!(a, b);
@@ -585,11 +657,14 @@ fn path_component_children_injection_is_consistent_across_macro_families() {
     };
 
     let a = html!(<dashboard::Panel><span>{"x"}</span></dashboard::Panel>).to_string();
-    let b = html_async!(<dashboard::Panel><span>{"x"}</span></dashboard::Panel>).to_string();
+    let b =
+        block_on(html_async!(<dashboard::Panel><span>{"x"}</span></dashboard::Panel>)).to_string();
     let c =
         html_in!(ctx, <dashboard_ctx::Panel><span>{"x"}</span></dashboard_ctx::Panel>).to_string();
-    let d = html_async_in!(ctx, <dashboard_ctx::Panel><span>{"x"}</span></dashboard_ctx::Panel>)
-        .to_string();
+    let d = block_on(
+        html_async_in!(ctx, <dashboard_ctx::Panel><span>{"x"}</span></dashboard_ctx::Panel>),
+    )
+    .to_string();
 
     assert_eq!(a, "<dashboard::Panel><span>x</span></dashboard::Panel>");
     assert_eq!(a, b);
@@ -648,18 +723,61 @@ fn html_in_evaluates_context_expression_once_and_threads_to_nested_components() 
 fn html_async_in_evaluates_context_expression_once_and_threads_to_nested_components() {
     CTX_EVAL_COUNT.store(0, Ordering::SeqCst);
 
-    let rendered = html_async_in!(
+    let rendered = block_on(html_async_in!(
         make_eval_ctx(),
         <EvalWrapper>
             <EvalLeaf>{"X"}</EvalLeaf>
             <EvalLeaf>{"Y"}</EvalLeaf>
         </EvalWrapper>
-    )
+    ))
     .to_string();
 
     assert_eq!(CTX_EVAL_COUNT.load(Ordering::SeqCst), 1);
     assert_eq!(
         rendered,
         "<EvalWrapper value=\"ctx-once\"><EvalLeaf value=\"ctx-once\">X</EvalLeaf><EvalLeaf value=\"ctx-once\">Y</EvalLeaf></EvalWrapper>"
+    );
+}
+
+#[test]
+fn html_async_awaits_marked_async_components_and_preserves_render_order() {
+    RENDER_SEQUENCE.store(0, Ordering::SeqCst);
+
+    let rendered = block_on(html_async!(
+        <section>
+            <SeqSync label="first" />
+            <SeqAsync async label="second" />
+            <SeqSync label="third" />
+        </section>
+    ))
+    .to_string();
+
+    assert_eq!(
+        rendered,
+        "<section><SeqSync label=\"first\" order=\"0\"></SeqSync><SeqAsync label=\"second\" order=\"1\"></SeqAsync><SeqSync label=\"third\" order=\"2\"></SeqSync></section>"
+    );
+}
+
+#[test]
+fn html_async_in_awaits_marked_async_components_and_threads_context() {
+    RENDER_SEQUENCE.store(0, Ordering::SeqCst);
+    let ctx = RenderCtx {
+        request_id: "req-async-seq",
+        tenant: "tenant-async-seq",
+    };
+
+    let rendered = block_on(html_async_in!(
+        ctx,
+        <main>
+            <CtxSeqSync label="alpha" />
+            <CtxSeqAsync async label="beta" />
+            <CtxSeqSync label="gamma" />
+        </main>
+    ))
+    .to_string();
+
+    assert_eq!(
+        rendered,
+        "<main><CtxSeqSync tenant=\"tenant-async-seq\" label=\"alpha\" order=\"0\"></CtxSeqSync><CtxSeqAsync request-id=\"req-async-seq\" label=\"beta\" order=\"1\"></CtxSeqAsync><CtxSeqSync tenant=\"tenant-async-seq\" label=\"gamma\" order=\"2\"></CtxSeqSync></main>"
     );
 }

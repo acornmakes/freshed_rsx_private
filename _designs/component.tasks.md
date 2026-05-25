@@ -172,11 +172,11 @@ Files:
 
 Tasks:
 
-- [ ] 8.1 Add async mode codegen wrapper (`async move { ... }`).
-- [ ] 8.2 Support `async` marker on component tags in async modes only.
-- [ ] 8.3 Expand marked calls with `.await`.
-- [ ] 8.4 Emit hard error when `async` marker appears in sync modes.
-- [ ] 8.5 Keep output order deterministic in mixed sync/async component trees.
+- [x] 8.1 Add async mode codegen wrapper (`async move { ... }`).
+- [x] 8.2 Support `async` marker on component tags in async modes only.
+- [x] 8.3 Expand marked calls with `.await`.
+- [x] 8.4 Emit hard error when `async` marker appears in sync modes.
+- [x] 8.5 Keep output order deterministic in mixed sync/async component trees.
 
 Exit criteria:
 
@@ -297,6 +297,9 @@ Exit criteria:
 - Avoid broad refactors before Phase 3 scaffolding is in place.
 - Treat diagnostics quality as a feature, not cleanup.
 - Prefer compile-time errors over runtime panics.
+- Idiomatic Rust Always
+- Avoid uses of panic! or unwrap whenever possible. Only use if necessary. 
+
 
 ## 7. Definition of Done
 

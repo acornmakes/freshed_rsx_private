@@ -63,6 +63,10 @@ impl CompileMode {
     fn uses_context(self) -> bool {
         matches!(self, Self::SyncWithCtx | Self::AsyncWithCtx)
     }
+
+    fn is_async(self) -> bool {
+        matches!(self, Self::AsyncNoCtx | Self::AsyncWithCtx)
+    }
 }
 
 struct MarkupOnlyInput {
@@ -117,6 +121,7 @@ struct ParsedComponentProps {
     props: Vec<ParsedComponentProp>,
     has_children_prop: bool,
     children_key_span: Option<proc_macro2::Span>,
+    async_marker_span: Option<proc_macro2::Span>,
     diagnostics: Vec<proc_macro2::TokenStream>,
 }
 
@@ -173,6 +178,31 @@ fn parse_component_props(
         match attribute {
             NodeAttribute::Attribute(attribute) => {
                 let key = attribute.key.to_string();
+
+                if key == "async" {
+                    if let Some(value) = attribute.value() {
+                        let invalid = proc_macro2_diagnostics::Diagnostic::spanned(
+                            value.span(),
+                            proc_macro2_diagnostics::Level::Error,
+                            "async component marker must be a bare attribute, e.g. <Card async />",
+                        );
+                        parsed.diagnostics.push(invalid.emit_as_expr_tokens());
+                    }
+
+                    if parsed.async_marker_span.is_some() {
+                        let duplicate = proc_macro2_diagnostics::Diagnostic::spanned(
+                            attribute.key.span(),
+                            proc_macro2_diagnostics::Level::Error,
+                            format!("duplicate async marker on component '{}'", component_label),
+                        );
+                        parsed.diagnostics.push(duplicate.emit_as_expr_tokens());
+                    } else {
+                        parsed.async_marker_span = Some(attribute.key.span());
+                    }
+
+                    continue;
+                }
+
                 if !seen_keys.insert(key.clone()) {
                     let duplicate = proc_macro2_diagnostics::Diagnostic::spanned(
                         attribute.key.span(),
@@ -571,6 +601,26 @@ where
 
             let component_fn_path = paths.component_fn_path;
             let props_type_path = paths.props_type_path;
+            if parsed_props.async_marker_span.is_some() && !self.compile_mode.is_async() {
+                let sync_marker_error = proc_macro2_diagnostics::Diagnostic::spanned(
+                    parsed_props
+                        .async_marker_span
+                        .unwrap_or_else(|| element.open_tag.name.span()),
+                    proc_macro2_diagnostics::Level::Error,
+                    "async component marker is only supported in html_async! and html_async_in!",
+                );
+                self.output
+                    .diagnostics
+                    .push(sync_marker_error.emit_as_expr_tokens());
+            }
+
+            let await_suffix =
+                if parsed_props.async_marker_span.is_some() && self.compile_mode.is_async() {
+                    quote!(.await)
+                } else {
+                    quote!()
+                };
+
             let component_expr = if self.compile_mode.uses_context() {
                 if let Some(ctx_ident) = &self.context_binding {
                     quote_spanned! { element.open_tag.name.span() =>
@@ -579,7 +629,7 @@ where
                             #props_type_path {
                                 #(#props_fields,)*
                             }
-                        )
+                        )#await_suffix
                     }
                 } else {
                     let missing_ctx = proc_macro2_diagnostics::Diagnostic::spanned(
@@ -598,7 +648,7 @@ where
                         #props_type_path {
                             #(#props_fields,)*
                         }
-                    )
+                    )#await_suffix
                 }
             };
 
@@ -797,14 +847,40 @@ pub(crate) fn html_inner(
         _ => quote!(),
     };
 
+    let async_value_bindings: Vec<syn::Ident> = values
+        .iter()
+        .enumerate()
+        .map(|(idx, _)| {
+            syn::Ident::new(&format!("__fr_value_{idx}"), proc_macro2::Span::call_site())
+        })
+        .collect();
+
+    let render_expr = if compile_mode.is_async() {
+        quote! {
+            async move {
+                #context_binding_stmt
+                #(
+                    let #async_value_bindings = #values;
+                )*
+                format!(#html_string, #(#async_value_bindings),*)
+            }
+        }
+    } else {
+        quote! {
+            {
+                #context_binding_stmt
+                format!(#html_string, #(#values),*)
+            }
+        }
+    };
+
     quote! {
         {
             // Make sure that "compile_error!(..);"  can be used in this context.
             #(#errors;)*
             // Make sure that "enum x{};" and "let _x = crate::element;"  can be used in this context
             #(#docs;)*
-            #context_binding_stmt
-            format!(#html_string, #(#values),*)
+            #render_expr
         }
     }
     .into()
@@ -1002,5 +1078,39 @@ mod tests {
         assert!(parsed.has_children_prop);
         assert_eq!(parsed.props.len(), 1);
         assert_eq!(parsed.props[0].key, "children");
+    }
+
+    #[test]
+    fn tracks_async_marker_without_treating_it_as_component_prop() {
+        let mut element = parse_first_element("<Button async label=\"Save\"></Button>");
+        let component_label = element.open_tag.name.to_string();
+        let parsed = parse_component_props(&component_label, element.attributes_mut());
+
+        assert!(parsed.diagnostics.is_empty());
+        assert!(parsed.async_marker_span.is_some());
+        assert_eq!(parsed.props.len(), 1);
+        assert_eq!(parsed.props[0].key, "label");
+    }
+
+    #[test]
+    fn rejects_duplicate_async_markers() {
+        let mut element = parse_first_element("<Button async async></Button>");
+        let component_label = element.open_tag.name.to_string();
+        let parsed = parse_component_props(&component_label, element.attributes_mut());
+
+        assert!(parsed.async_marker_span.is_some());
+        assert!(!parsed.diagnostics.is_empty());
+        assert!(parsed.props.is_empty());
+    }
+
+    #[test]
+    fn rejects_async_marker_with_assigned_value() {
+        let mut element = parse_first_element("<Button async={flag}></Button>");
+        let component_label = element.open_tag.name.to_string();
+        let parsed = parse_component_props(&component_label, element.attributes_mut());
+
+        assert!(parsed.async_marker_span.is_some());
+        assert!(!parsed.diagnostics.is_empty());
+        assert!(parsed.props.is_empty());
     }
 }

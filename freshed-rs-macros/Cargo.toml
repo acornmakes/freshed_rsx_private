@@ -17,3 +17,4 @@ syn_derive.workspace=true
 [dev-dependencies]
 insta = "1.43.2"
 trybuild = "1.0.114"
+futures = "0.3.31"

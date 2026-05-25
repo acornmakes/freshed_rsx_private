@@ -1,0 +1,15 @@
+use freshed_rs_macros::html_ide;
+
+pub mod docs {
+    pub fn element() {}
+}
+
+fn main() {
+    let _out = html_ide!(
+        <!DOCTYPE html>
+        <html>
+            <head><title>{"UI"}</title></head>
+            <body><main>{"content"}</main></body>
+        </html>
+    );
+}

@@ -73,16 +73,35 @@ html_async_in!(ctx, <UserCard async user_id={id} />).await
 
 ## 3.1 Component Declaration Contract
 
-A sync component is a function with this contract:
+Components are declared with the `#[component]` attribute on a snake_case function.
+The macro generates the PascalCase callable component symbol used by markup tags.
+
+Declaration pattern:
 
 ```rust
-pub fn ComponentName(ctx: &RenderContext<'_>, props: ComponentNameProps) -> impl ::core::fmt::Display
+use freshed_rs_macros::component;
+
+#[component]
+pub fn user_card(ctx: &RenderContext<'_>, props: user_card_props) -> impl ::core::fmt::Display {
+    // ...
+}
 ```
 
-An async component is a function with this contract:
+Generated symbols:
+
+- `UserCard` function wrapper (used by `<UserCard ... />` tags)
+- `UserCardProps` type alias to `user_card_props` when needed
+
+A sync component function body should follow this contract:
 
 ```rust
-pub async fn ComponentName(ctx: &RenderContext<'_>, props: ComponentNameProps) -> impl ::core::fmt::Display
+pub fn component_name(ctx: &RenderContext<'_>, props: component_name_props) -> impl ::core::fmt::Display
+```
+
+An async component function body should follow this contract:
+
+```rust
+pub async fn component_name(ctx: &RenderContext<'_>, props: component_name_props) -> impl ::core::fmt::Display
 ```
 
 Accepted return types:
@@ -93,7 +112,9 @@ Accepted return types:
 
 Required props type convention:
 
-- For `ComponentName`, macro infers props type as `ComponentNameProps` in the same module/path.
+- `#[component]` maps snake_case function names to PascalCase tag symbols.
+- The generated PascalCase symbol expects `PascalCaseProps`.
+- If your declared props type is not already `PascalCaseProps`, the macro emits an alias.
 - Props type should be a Rust struct.
 - If component accepts children, props struct includes field `children`.
 - Optional props are declared as `Option<T>` and are omitted at call-sites when desired.
@@ -107,13 +128,14 @@ Optional-prop contract:
 Example:
 
 ```rust
-pub struct ButtonProps {
+pub struct user_button_props {
     pub label: String,
     pub class: String,
     pub children: String,
 }
 
-pub fn Button(ctx: &RenderContext<'_>, props: ButtonProps) -> String {
+#[component]
+pub fn user_button(ctx: &RenderContext<'_>, props: user_button_props) -> String {
     let is_signed_in = ctx.user.is_some();
     html!(
         <button class={props.class}>
@@ -292,6 +314,8 @@ Async expansion sketch:
 ## 4.3 Props Type Inference
 
 For component path `P::ComponentName`, inferred props type path is `P::ComponentNameProps`.
+
+When using `#[component]`, `P::ComponentName` is generated from `P::component_name`.
 
 Examples:
 
@@ -557,7 +581,8 @@ pub struct CardProps {
     pub children: String,
 }
 
-pub fn Card(ctx: &RenderContext<'_>, props: CardProps) -> String {
+#[component]
+pub fn card(ctx: &RenderContext<'_>, props: CardProps) -> String {
     let user_name = ctx.user.map(|u| u.name.as_str()).unwrap_or("Guest");
     html!(
         <section class="card">
@@ -573,7 +598,8 @@ pub struct ButtonProps {
     pub children: String,
 }
 
-pub fn Button(_ctx: &RenderContext<'_>, props: ButtonProps) -> String {
+#[component]
+pub fn button(_ctx: &RenderContext<'_>, props: ButtonProps) -> String {
     html!(<button>{props.label}{props.children}</button>)
 }
 
@@ -585,12 +611,13 @@ let out = html_in!(ctx,
     </Card>
 );
 
-pub struct UserCardProps {
+pub struct user_card_props {
     pub user_id: i64,
     pub children: String,
 }
 
-pub async fn UserCard(ctx: &RenderContext<'_>, props: UserCardProps) -> String {
+#[component]
+pub async fn user_card(ctx: &RenderContext<'_>, props: user_card_props) -> String {
     let user_name = load_user_name(ctx.db, props.user_id).await;
     html!(
         <article>

@@ -1,4 +1,4 @@
-use freshed_rs_macros::html_in;
+use freshed_rs_macros::{component, html_in};
 
 #[derive(Clone, Copy)]
 struct Ctx {
@@ -8,16 +8,16 @@ struct Ctx {
 pub struct ShellProps {
     pub children: String,
 }
-#[allow(non_snake_case)]
-fn Shell(ctx: Ctx, props: ShellProps) -> String {
+#[component]
+fn shell(ctx: Ctx, props: ShellProps) -> String {
     format!("<Shell req=\"{}\">{}</Shell>", ctx.request_id, props.children)
 }
 
 pub struct TileProps {
     pub children: String,
 }
-#[allow(non_snake_case)]
-fn Tile(ctx: Ctx, props: TileProps) -> String {
+#[component]
+fn tile(ctx: Ctx, props: TileProps) -> String {
     format!("<Tile req=\"{}\">{}</Tile>", ctx.request_id, props.children)
 }
 

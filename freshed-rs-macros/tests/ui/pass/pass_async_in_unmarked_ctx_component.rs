@@ -1,4 +1,4 @@
-use freshed_rs_macros::html_async_in;
+use freshed_rs_macros::{component, html_async_in};
 
 #[derive(Clone, Copy)]
 struct Ctx {
@@ -8,8 +8,8 @@ struct Ctx {
 pub struct BannerProps {
     pub children: String,
 }
-#[allow(non_snake_case)]
-fn Banner(ctx: Ctx, props: BannerProps) -> String {
+#[component]
+fn banner(ctx: Ctx, props: BannerProps) -> String {
     format!("<Banner user=\"{}\">{}</Banner>", ctx.user, props.children)
 }
 

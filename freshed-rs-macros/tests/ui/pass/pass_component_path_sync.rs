@@ -5,8 +5,8 @@ mod ui {
         pub kind: &'static str,
         pub children: String,
     }
-    #[allow(non_snake_case)]
-    pub fn Button(props: ButtonProps) -> String {
+    #[freshed_rs_macros::component]
+    pub fn button(props: ButtonProps) -> String {
         format!("<ui::Button kind=\"{}\">{}</ui::Button>", props.kind, props.children)
     }
 }

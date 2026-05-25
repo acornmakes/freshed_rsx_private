@@ -1,10 +1,10 @@
-use freshed_rs_macros::html;
+use freshed_rs_macros::{component, html};
 
 pub struct CardProps {
     pub children: String,
 }
-#[allow(non_snake_case)]
-pub fn Card(props: CardProps) -> String {
+#[component]
+pub fn card(props: CardProps) -> String {
     format!("<Card>{}</Card>", props.children)
 }
 
@@ -12,8 +12,8 @@ pub struct ItemProps {
     pub label: &'static str,
     pub children: String,
 }
-#[allow(non_snake_case)]
-pub fn Item(props: ItemProps) -> String {
+#[component]
+pub fn item(props: ItemProps) -> String {
     format!("<Item label=\"{}\">{}</Item>", props.label, props.children)
 }
 

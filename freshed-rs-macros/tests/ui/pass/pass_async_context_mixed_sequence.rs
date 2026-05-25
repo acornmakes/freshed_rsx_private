@@ -1,4 +1,4 @@
-use freshed_rs_macros::html_async_in;
+use freshed_rs_macros::{component, html_async_in};
 
 #[derive(Clone, Copy)]
 struct Ctx {
@@ -8,16 +8,16 @@ struct Ctx {
 pub struct SyncBadgeProps {
     pub children: String,
 }
-#[allow(non_snake_case)]
-fn SyncBadge(ctx: Ctx, props: SyncBadgeProps) -> String {
+#[component]
+fn sync_badge(ctx: Ctx, props: SyncBadgeProps) -> String {
     format!("<SyncBadge tenant=\"{}\">{}</SyncBadge>", ctx.tenant, props.children)
 }
 
 pub struct AsyncBadgeProps {
     pub children: String,
 }
-#[allow(non_snake_case)]
-async fn AsyncBadge(ctx: Ctx, props: AsyncBadgeProps) -> String {
+#[component]
+async fn async_badge(ctx: Ctx, props: AsyncBadgeProps) -> String {
     let () = async {}.await;
     format!("<AsyncBadge tenant=\"{}\">{}</AsyncBadge>", ctx.tenant, props.children)
 }

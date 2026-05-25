@@ -49,6 +49,7 @@ Tasks:
 - [x] 1.3 Add `html_in!` proc macro entrypoint (first argument is context expression).
 - [x] 1.4 Add `html_async_in!` proc macro entrypoint.
 - [x] 1.5 Route all entrypoints through a single internal compile function with mode flags.
+- [x] 1.6 Add `#[component]` declaration macro to support snake_case component function definitions.
 
 Exit criteria:
 

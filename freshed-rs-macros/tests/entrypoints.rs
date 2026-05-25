@@ -1,4 +1,4 @@
-use freshed_rs_macros::{html, html_async, html_async_in, html_ide, html_in};
+use freshed_rs_macros::{component, html, html_async, html_async_in, html_ide, html_in};
 use futures::executor::block_on;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -10,17 +10,27 @@ pub struct CardProps {
     pub children: String,
 }
 
-#[allow(non_snake_case)]
-pub fn Card(props: CardProps) -> String {
+#[component]
+pub fn card(props: CardProps) -> String {
     format!("<Card>{}</Card>", props.children)
+}
+
+#[allow(non_camel_case_types)]
+pub struct user_card_props {
+    pub children: String,
+}
+
+#[component]
+pub fn user_card(props: user_card_props) -> String {
+    format!("<UserCard>{}</UserCard>", props.children)
 }
 
 pub struct ProfileBadgeProps {
     pub children: String,
 }
 
-#[allow(non_snake_case)]
-pub fn ProfileBadge(props: ProfileBadgeProps) -> String {
+#[component]
+pub fn profile_badge(props: ProfileBadgeProps) -> String {
     format!("<ProfileBadge>{}</ProfileBadge>", props.children)
 }
 
@@ -29,8 +39,8 @@ pub struct PanelProps {
     pub children: &'static str,
 }
 
-#[allow(non_snake_case)]
-pub fn Panel(props: PanelProps) -> String {
+#[component]
+pub fn panel(props: PanelProps) -> String {
     format!(
         "<Panel title=\"{}\">{}</Panel>",
         props.title, props.children
@@ -44,8 +54,8 @@ pub struct FancyButtonProps {
     pub children: String,
 }
 
-#[allow(non_snake_case)]
-pub fn FancyButton(props: FancyButtonProps) -> String {
+#[component]
+pub fn fancy_button(props: FancyButtonProps) -> String {
     format!(
         "<FancyButton label=\"{}\" rank=\"{}\" tone=\"{}\">{}</FancyButton>",
         props.label, props.rank, props.tone, props.children
@@ -59,8 +69,8 @@ pub struct ActionButtonProps {
     pub children: String,
 }
 
-#[allow(non_snake_case)]
-pub fn ActionButton(props: ActionButtonProps) -> String {
+#[component]
+pub fn action_button(props: ActionButtonProps) -> String {
     format!(
         "<ActionButton count=\"{}\" kind=\"{}\" action=\"{}\">{}</ActionButton>",
         props.count, props.kind, props.action, props.children
@@ -74,8 +84,8 @@ pub struct MenuItemProps {
     pub children: String,
 }
 
-#[allow(non_snake_case)]
-pub fn MenuItem(props: MenuItemProps) -> String {
+#[component]
+pub fn menu_item(props: MenuItemProps) -> String {
     format!(
         "<MenuItem label=\"{}\" priority=\"{}\" glyph=\"{}\">{}</MenuItem>",
         props.label, props.priority, props.glyph, props.children
@@ -89,8 +99,8 @@ pub struct AuthBadgeProps {
     pub children: String,
 }
 
-#[allow(non_snake_case)]
-pub fn AuthBadge(props: AuthBadgeProps) -> String {
+#[component]
+pub fn auth_badge(props: AuthBadgeProps) -> String {
     format!(
         "<AuthBadge role=\"{}\" level=\"{}\" badge=\"{}\">{}</AuthBadge>",
         props.role, props.level, props.badge, props.children
@@ -103,8 +113,8 @@ pub mod ui {
         pub children: String,
     }
 
-    #[allow(non_snake_case)]
-    pub fn Button(props: ButtonProps) -> String {
+    #[freshed_rs_macros::component]
+    pub fn button(props: ButtonProps) -> String {
         format!(
             "<ui::Button data-kind=\"{}\">{}</ui::Button>",
             props.data_kind, props.children
@@ -117,8 +127,8 @@ pub mod dashboard {
         pub children: String,
     }
 
-    #[allow(non_snake_case)]
-    pub fn Panel(props: PanelProps) -> String {
+    #[freshed_rs_macros::component]
+    pub fn panel(props: PanelProps) -> String {
         format!("<dashboard::Panel>{}</dashboard::Panel>", props.children)
     }
 }
@@ -133,10 +143,24 @@ pub struct CtxCardProps {
     pub children: String,
 }
 
-#[allow(non_snake_case)]
-pub fn CtxCard(ctx: RenderCtx, props: CtxCardProps) -> String {
+#[component]
+pub fn ctx_card(ctx: RenderCtx, props: CtxCardProps) -> String {
     format!(
         "<CtxCard request-id=\"{}\">{}</CtxCard>",
+        ctx.request_id, props.children
+    )
+}
+
+#[allow(non_camel_case_types)]
+pub struct ctx_user_card_props {
+    pub children: String,
+}
+
+#[component]
+pub async fn ctx_user_card(ctx: RenderCtx, props: ctx_user_card_props) -> String {
+    let () = async {}.await;
+    format!(
+        "<CtxUserCard request-id=\"{}\">{}</CtxUserCard>",
         ctx.request_id, props.children
     )
 }
@@ -145,8 +169,8 @@ pub struct CtxProfileBadgeProps {
     pub children: String,
 }
 
-#[allow(non_snake_case)]
-pub fn CtxProfileBadge(ctx: RenderCtx, props: CtxProfileBadgeProps) -> String {
+#[component]
+pub fn ctx_profile_badge(ctx: RenderCtx, props: CtxProfileBadgeProps) -> String {
     format!(
         "<CtxProfileBadge tenant=\"{}\">{}</CtxProfileBadge>",
         ctx.tenant, props.children
@@ -160,8 +184,8 @@ pub struct CtxMenuItemProps {
     pub children: String,
 }
 
-#[allow(non_snake_case)]
-pub fn CtxMenuItem(ctx: RenderCtx, props: CtxMenuItemProps) -> String {
+#[component]
+pub fn ctx_menu_item(ctx: RenderCtx, props: CtxMenuItemProps) -> String {
     format!(
         "<CtxMenuItem request-id=\"{}\" label=\"{}\" priority=\"{}\" glyph=\"{}\">{}</CtxMenuItem>",
         ctx.request_id, props.label, props.priority, props.glyph, props.children
@@ -175,8 +199,8 @@ pub struct CtxAuthBadgeProps {
     pub children: String,
 }
 
-#[allow(non_snake_case)]
-pub fn CtxAuthBadge(ctx: RenderCtx, props: CtxAuthBadgeProps) -> String {
+#[component]
+pub fn ctx_auth_badge(ctx: RenderCtx, props: CtxAuthBadgeProps) -> String {
     format!(
         "<CtxAuthBadge tenant=\"{}\" role=\"{}\" level=\"{}\" badge=\"{}\">{}</CtxAuthBadge>",
         ctx.tenant, props.role, props.level, props.badge, props.children
@@ -190,8 +214,8 @@ pub mod dashboard_ctx {
         pub children: String,
     }
 
-    #[allow(non_snake_case)]
-    pub fn Panel(ctx: RenderCtx, props: PanelProps) -> String {
+    #[freshed_rs_macros::component]
+    pub fn panel(ctx: RenderCtx, props: PanelProps) -> String {
         format!(
             "<dashboard_ctx::Panel request-id=\"{}\">{}</dashboard_ctx::Panel>",
             ctx.request_id, props.children
@@ -215,8 +239,8 @@ pub struct EvalLeafProps {
     pub children: String,
 }
 
-#[allow(non_snake_case)]
-pub fn EvalLeaf(ctx: EvalCtx, props: EvalLeafProps) -> String {
+#[component]
+pub fn eval_leaf(ctx: EvalCtx, props: EvalLeafProps) -> String {
     format!(
         "<EvalLeaf value=\"{}\">{}</EvalLeaf>",
         ctx.value, props.children
@@ -227,8 +251,8 @@ pub struct EvalWrapperProps {
     pub children: String,
 }
 
-#[allow(non_snake_case)]
-pub fn EvalWrapper(ctx: EvalCtx, props: EvalWrapperProps) -> String {
+#[component]
+pub fn eval_wrapper(ctx: EvalCtx, props: EvalWrapperProps) -> String {
     format!(
         "<EvalWrapper value=\"{}\">{}</EvalWrapper>",
         ctx.value, props.children
@@ -242,8 +266,8 @@ pub struct SeqSyncProps {
     pub children: String,
 }
 
-#[allow(non_snake_case)]
-pub fn SeqSync(props: SeqSyncProps) -> String {
+#[component]
+pub fn seq_sync(props: SeqSyncProps) -> String {
     let order = RENDER_SEQUENCE.fetch_add(1, Ordering::SeqCst);
     format!(
         "<SeqSync label=\"{}\" order=\"{}\">{}</SeqSync>",
@@ -256,8 +280,8 @@ pub struct SeqAsyncProps {
     pub children: String,
 }
 
-#[allow(non_snake_case)]
-pub async fn SeqAsync(props: SeqAsyncProps) -> String {
+#[component]
+pub async fn seq_async(props: SeqAsyncProps) -> String {
     let () = async {}.await;
     let order = RENDER_SEQUENCE.fetch_add(1, Ordering::SeqCst);
     format!(
@@ -271,8 +295,8 @@ pub struct CtxSeqSyncProps {
     pub children: String,
 }
 
-#[allow(non_snake_case)]
-pub fn CtxSeqSync(ctx: RenderCtx, props: CtxSeqSyncProps) -> String {
+#[component]
+pub fn ctx_seq_sync(ctx: RenderCtx, props: CtxSeqSyncProps) -> String {
     let order = RENDER_SEQUENCE.fetch_add(1, Ordering::SeqCst);
     format!(
         "<CtxSeqSync tenant=\"{}\" label=\"{}\" order=\"{}\">{}</CtxSeqSync>",
@@ -285,8 +309,8 @@ pub struct CtxSeqAsyncProps {
     pub children: String,
 }
 
-#[allow(non_snake_case)]
-pub async fn CtxSeqAsync(ctx: RenderCtx, props: CtxSeqAsyncProps) -> String {
+#[component]
+pub async fn ctx_seq_async(ctx: RenderCtx, props: CtxSeqAsyncProps) -> String {
     let () = async {}.await;
     let order = RENDER_SEQUENCE.fetch_add(1, Ordering::SeqCst);
     format!(
@@ -457,6 +481,12 @@ fn html_renders_component_like_uppercase_tag_shape() {
 }
 
 #[test]
+fn html_renders_component_from_snake_case_declaration_macro() {
+    let rendered = html!(<UserCard>{"snake"}</UserCard>).to_string();
+    assert_eq!(rendered, "<UserCard>snake</UserCard>");
+}
+
+#[test]
 fn html_ide_renders_component_like_path_tag_shape() {
     let rendered = html_ide!(<ui::Button data_kind={"secondary"}>{"Open"}</ui::Button>).to_string();
     assert_eq!(
@@ -497,6 +527,20 @@ fn html_async_in_renders_component_like_path_tag_shape_with_context() {
     assert_eq!(
         rendered,
         "<dashboard_ctx::Panel request-id=\"req-22\"><span>ok</span></dashboard_ctx::Panel>"
+    );
+}
+
+#[test]
+fn html_async_in_renders_async_component_from_snake_case_declaration_macro() {
+    let ctx = RenderCtx {
+        request_id: "req-snake-async",
+        tenant: "tenant-snake",
+    };
+    let rendered =
+        block_on(html_async_in!(ctx, <CtxUserCard async>{"ok"}</CtxUserCard>)).to_string();
+    assert_eq!(
+        rendered,
+        "<CtxUserCard request-id=\"req-snake-async\">ok</CtxUserCard>"
     );
 }
 
@@ -780,4 +824,25 @@ fn html_async_in_awaits_marked_async_components_and_threads_context() {
         rendered,
         "<main><CtxSeqSync tenant=\"tenant-async-seq\" label=\"alpha\" order=\"0\"></CtxSeqSync><CtxSeqAsync request-id=\"req-async-seq\" label=\"beta\" order=\"1\"></CtxSeqAsync><CtxSeqSync tenant=\"tenant-async-seq\" label=\"gamma\" order=\"2\"></CtxSeqSync></main>"
     );
+}
+
+pub struct BoardGameProps<'a> {
+    pub name: &'a str,
+    pub children: String,
+}
+
+#[component]
+fn board_game(game: BoardGameProps) -> String {
+    html!(<div>{game.name}</div>).to_string()
+}
+
+#[test]
+fn test_board_game() {
+    // let gp = BoardGameProps {
+    //     name: &"Ticket to Ride".to_string(),
+    // };
+    assert_eq!(
+        "<div>Ticket to Ride</div>",
+        html!(<BoardGame name={"Ticket to Ride"} />)
+    )
 }

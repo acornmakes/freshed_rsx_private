@@ -1,10 +1,10 @@
-use freshed_rs_macros::html_async;
+use freshed_rs_macros::{component, html_async};
 
 pub struct CardProps {
     pub children: String,
 }
-#[allow(non_snake_case)]
-pub async fn Card(props: CardProps) -> String {
+#[component]
+pub async fn card(props: CardProps) -> String {
     let () = async {}.await;
     format!("<Card>{}</Card>", props.children)
 }

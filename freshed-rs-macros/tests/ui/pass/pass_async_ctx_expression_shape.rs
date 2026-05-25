@@ -1,4 +1,4 @@
-use freshed_rs_macros::html_async_in;
+use freshed_rs_macros::{component, html, html_async_in};
 
 #[derive(Clone, Copy)]
 struct Ctx {
@@ -8,10 +8,11 @@ struct Ctx {
 pub struct RowProps {
     pub children: String,
 }
-#[allow(non_snake_case)]
-async fn Row(ctx: Ctx, props: RowProps) -> String {
+#[component]
+async fn row(ctx: Ctx, props: RowProps) -> String {
     let () = async {}.await;
-    format!("<Row id=\"{}\">{}</Row>", ctx.id, props.children)
+    // format!("<Row id=\"{}\">{}</Row>", ctx.id, props.children)
+    html!(<div><div>{ctx.id}</div>{props.children}</div>)
 }
 
 fn main() {

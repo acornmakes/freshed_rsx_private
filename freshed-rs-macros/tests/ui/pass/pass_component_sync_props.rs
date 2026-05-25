@@ -1,13 +1,14 @@
-use freshed_rs_macros::html;
+use freshed_rs_macros::{component, html};
 
 pub struct BadgeProps {
     pub tone: &'static str,
     pub children: String,
 }
 
-#[allow(non_snake_case)]
-pub fn Badge(props: BadgeProps) -> String {
-    format!("<Badge tone=\"{}\">{}</Badge>", props.tone, props.children)
+#[component]
+pub fn badge(props: BadgeProps) -> String {
+    //format!("<Badge tone=\"{}\">{}</Badge>", props.tone, props.children)
+    html!(<div><div>{props.tone}</div>{props.children}</div>)
 }
 
 fn main() {

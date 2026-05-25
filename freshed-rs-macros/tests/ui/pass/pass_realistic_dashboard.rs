@@ -1,4 +1,4 @@
-use freshed_rs_macros::{html, html_async, html_async_in, html_in};
+use freshed_rs_macros::{component, html, html_async, html_async_in, html_in};
 
 #[derive(Clone, Copy)]
 struct Ctx {
@@ -9,8 +9,8 @@ pub struct HeaderProps {
     pub title: &'static str,
     pub children: String,
 }
-#[allow(non_snake_case)]
-fn Header(props: HeaderProps) -> String {
+#[component]
+fn header(props: HeaderProps) -> String {
     format!("<Header title=\"{}\">{}</Header>", props.title, props.children)
 }
 
@@ -18,16 +18,16 @@ pub struct CtxHeaderProps {
     pub title: &'static str,
     pub children: String,
 }
-#[allow(non_snake_case)]
-fn CtxHeader(ctx: Ctx, props: CtxHeaderProps) -> String {
+#[component]
+fn ctx_header(ctx: Ctx, props: CtxHeaderProps) -> String {
     format!("<CtxHeader tenant=\"{}\" title=\"{}\">{}</CtxHeader>", ctx.tenant, props.title, props.children)
 }
 
 pub struct AsyncPanelProps {
     pub children: String,
 }
-#[allow(non_snake_case)]
-async fn AsyncPanel(props: AsyncPanelProps) -> String {
+#[component]
+async fn async_panel(props: AsyncPanelProps) -> String {
     let () = async {}.await;
     format!("<AsyncPanel>{}</AsyncPanel>", props.children)
 }
@@ -35,8 +35,8 @@ async fn AsyncPanel(props: AsyncPanelProps) -> String {
 pub struct CtxAsyncPanelProps {
     pub children: String,
 }
-#[allow(non_snake_case)]
-async fn CtxAsyncPanel(ctx: Ctx, props: CtxAsyncPanelProps) -> String {
+#[component]
+async fn ctx_async_panel(ctx: Ctx, props: CtxAsyncPanelProps) -> String {
     let () = async {}.await;
     format!("<CtxAsyncPanel tenant=\"{}\">{}</CtxAsyncPanel>", ctx.tenant, props.children)
 }

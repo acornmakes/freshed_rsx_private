@@ -1,18 +1,18 @@
-use freshed_rs_macros::html_async;
+use freshed_rs_macros::{component, html_async};
 
 pub struct SyncBadgeProps {
     pub children: String,
 }
-#[allow(non_snake_case)]
-fn SyncBadge(props: SyncBadgeProps) -> String {
+#[component]
+fn sync_badge(props: SyncBadgeProps) -> String {
     format!("<SyncBadge>{}</SyncBadge>", props.children)
 }
 
 pub struct AsyncBadgeProps {
     pub children: String,
 }
-#[allow(non_snake_case)]
-async fn AsyncBadge(props: AsyncBadgeProps) -> String {
+#[component]
+async fn async_badge(props: AsyncBadgeProps) -> String {
     let () = async {}.await;
     format!("<AsyncBadge>{}</AsyncBadge>", props.children)
 }

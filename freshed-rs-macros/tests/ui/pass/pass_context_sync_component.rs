@@ -1,4 +1,4 @@
-use freshed_rs_macros::html_in;
+use freshed_rs_macros::{component, html_in};
 
 #[derive(Clone, Copy)]
 struct Ctx {
@@ -8,8 +8,8 @@ struct Ctx {
 pub struct ProfileProps {
     pub children: String,
 }
-#[allow(non_snake_case)]
-fn Profile(ctx: Ctx, props: ProfileProps) -> String {
+#[component]
+fn profile(ctx: Ctx, props: ProfileProps) -> String {
     format!("<Profile tenant=\"{}\">{}</Profile>", ctx.tenant, props.children)
 }
 

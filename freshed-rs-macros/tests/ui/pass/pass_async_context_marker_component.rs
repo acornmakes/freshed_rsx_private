@@ -1,4 +1,4 @@
-use freshed_rs_macros::html_async_in;
+use freshed_rs_macros::{component, html_async_in};
 
 #[derive(Clone, Copy)]
 struct Ctx {
@@ -8,8 +8,8 @@ struct Ctx {
 pub struct UserCardProps {
     pub children: String,
 }
-#[allow(non_snake_case)]
-async fn UserCard(ctx: Ctx, props: UserCardProps) -> String {
+#[component]
+async fn user_card(ctx: Ctx, props: UserCardProps) -> String {
     let () = async {}.await;
     format!("<UserCard req=\"{}\">{}</UserCard>", ctx.request_id, props.children)
 }

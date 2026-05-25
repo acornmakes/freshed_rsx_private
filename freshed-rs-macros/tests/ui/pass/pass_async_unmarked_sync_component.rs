@@ -1,10 +1,10 @@
-use freshed_rs_macros::html_async;
+use freshed_rs_macros::{component, html_async};
 
 pub struct BannerProps {
     pub children: String,
 }
-#[allow(non_snake_case)]
-fn Banner(props: BannerProps) -> String {
+#[component]
+fn banner(props: BannerProps) -> String {
     format!("<Banner>{}</Banner>", props.children)
 }
 

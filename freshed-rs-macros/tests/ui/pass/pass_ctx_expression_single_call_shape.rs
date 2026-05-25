@@ -1,4 +1,4 @@
-use freshed_rs_macros::html_in;
+use freshed_rs_macros::{component, html_in};
 
 #[derive(Clone, Copy)]
 struct Ctx {
@@ -8,8 +8,8 @@ struct Ctx {
 pub struct RowProps {
     pub children: String,
 }
-#[allow(non_snake_case)]
-fn Row(ctx: Ctx, props: RowProps) -> String {
+#[component]
+fn row(ctx: Ctx, props: RowProps) -> String {
     format!("<Row id=\"{}\">{}</Row>", ctx.id, props.children)
 }
 

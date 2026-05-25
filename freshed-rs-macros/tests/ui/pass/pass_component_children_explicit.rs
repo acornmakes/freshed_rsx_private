@@ -1,11 +1,11 @@
-use freshed_rs_macros::html;
+use freshed_rs_macros::{component, html};
 
 pub struct WrapperProps {
     pub title: &'static str,
     pub children: &'static str,
 }
-#[allow(non_snake_case)]
-fn Wrapper(props: WrapperProps) -> String {
+#[component]
+fn wrapper(props: WrapperProps) -> String {
     format!("<Wrapper title=\"{}\">{}</Wrapper>", props.title, props.children)
 }
 

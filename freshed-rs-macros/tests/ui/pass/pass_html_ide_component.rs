@@ -1,4 +1,4 @@
-use freshed_rs_macros::html_ide;
+use freshed_rs_macros::{component, html_ide};
 
 pub mod docs {
     pub fn element() {}
@@ -7,8 +7,8 @@ pub mod docs {
 pub struct HeroProps {
     pub children: String,
 }
-#[allow(non_snake_case)]
-fn Hero(props: HeroProps) -> String {
+#[component]
+fn hero(props: HeroProps) -> String {
     format!("<Hero>{}</Hero>", props.children)
 }
 

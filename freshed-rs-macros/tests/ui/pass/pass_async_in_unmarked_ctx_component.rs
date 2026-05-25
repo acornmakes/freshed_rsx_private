@@ -1,4 +1,4 @@
-use freshed_rs_macros::{component, html_async_in};
+use freshed_rs_macros::{component, html_async_ctx};
 
 #[derive(Clone, Copy)]
 struct Ctx {
@@ -16,5 +16,5 @@ fn banner(ctx: Ctx, props: BannerProps) -> String {
 
 fn main() {
     let ctx = Ctx { user: "ava" };
-    let _future = html_async_in!(ctx, <Banner>{"welcome"}</Banner>);
+    let _future = html_async_ctx!(ctx, <Banner>{"welcome"}</Banner>);
 }

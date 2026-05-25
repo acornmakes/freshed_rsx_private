@@ -1,4 +1,4 @@
-use freshed_rs_macros::html_async_in;
+use freshed_rs_macros::html_async_ctx;
 
 #[derive(Default)]
 pub struct ButtonProps {}
@@ -12,5 +12,5 @@ fn main() {
     let ctx = 1;
     let a = 1;
     let b = 2;
-    let _ = html_async_in!(ctx, <Button {a + b}></Button>);
+    let _ = html_async_ctx!(ctx, <Button {a + b}></Button>);
 }

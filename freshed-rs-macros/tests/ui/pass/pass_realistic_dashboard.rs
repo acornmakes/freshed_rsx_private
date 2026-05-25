@@ -1,4 +1,4 @@
-use freshed_rs_macros::{component, html, html_async, html_async_in, html_in};
+use freshed_rs_macros::{component, html, html_async, html_async_ctx, html_ctx};
 
 #[derive(Clone, Copy)]
 struct Ctx {
@@ -12,7 +12,10 @@ pub struct HeaderProps {
 }
 #[component]
 fn header(props: HeaderProps) -> String {
-    format!("<Header title=\"{}\">{}</Header>", props.title, props.children)
+    format!(
+        "<Header title=\"{}\">{}</Header>",
+        props.title, props.children
+    )
 }
 
 #[derive(Default)]
@@ -22,7 +25,10 @@ pub struct CtxHeaderProps {
 }
 #[component]
 fn ctx_header(ctx: Ctx, props: CtxHeaderProps) -> String {
-    format!("<CtxHeader tenant=\"{}\" title=\"{}\">{}</CtxHeader>", ctx.tenant, props.title, props.children)
+    format!(
+        "<CtxHeader tenant=\"{}\" title=\"{}\">{}</CtxHeader>",
+        ctx.tenant, props.title, props.children
+    )
 }
 
 #[derive(Default)]
@@ -42,14 +48,18 @@ pub struct CtxAsyncPanelProps {
 #[component]
 async fn ctx_async_panel(ctx: Ctx, props: CtxAsyncPanelProps) -> String {
     let () = async {}.await;
-    format!("<CtxAsyncPanel tenant=\"{}\">{}</CtxAsyncPanel>", ctx.tenant, props.children)
+    format!(
+        "<CtxAsyncPanel tenant=\"{}\">{}</CtxAsyncPanel>",
+        ctx.tenant, props.children
+    )
 }
 
 fn main() {
     let ctx = Ctx { tenant: "acme" };
 
     let _sync = html!(<Header title="Overview"><p>{"sync"}</p></Header>);
-    let _sync_ctx = html_in!(ctx, <CtxHeader title="Overview"><p>{"ctx"}</p></CtxHeader>);
+    let _sync_ctx = html_ctx!(ctx, <CtxHeader title="Overview"><p>{"ctx"}</p></CtxHeader>);
     let _async = html_async!(<AsyncPanel async><p>{"async"}</p></AsyncPanel>);
-    let _async_ctx = html_async_in!(ctx, <CtxAsyncPanel async><p>{"async-ctx"}</p></CtxAsyncPanel>);
+    let _async_ctx =
+        html_async_ctx!(ctx, <CtxAsyncPanel async><p>{"async-ctx"}</p></CtxAsyncPanel>);
 }

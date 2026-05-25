@@ -1,4 +1,4 @@
-use freshed_rs_macros::{component, html_in};
+use freshed_rs_macros::{component, html_ctx};
 
 #[derive(Clone, Copy)]
 struct Ctx {
@@ -19,5 +19,5 @@ fn make_ctx(seed: usize) -> Ctx {
 }
 
 fn main() {
-    let _out = html_in!(make_ctx(4), <Row>{"one"}</Row>);
+    let _out = html_ctx!(make_ctx(4), <Row>{"one"}</Row>);
 }

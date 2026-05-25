@@ -1,4 +1,4 @@
-use freshed_rs_macros::html_in;
+use freshed_rs_macros::html_ctx;
 
 #[derive(Clone, Copy)]
 struct Ctx;
@@ -15,5 +15,5 @@ pub fn UserCard(_ctx: Ctx, props: UserCardProps) -> String {
 
 fn main() {
     let ctx = Ctx;
-    let _ = html_in!(ctx, <UserCard async>{"x"}</UserCard>);
+    let _ = html_ctx!(ctx, <UserCard async>{"x"}</UserCard>);
 }

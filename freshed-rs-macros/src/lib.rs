@@ -270,12 +270,12 @@ pub fn html_async(tokens: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
-pub fn html_in(tokens: TokenStream) -> TokenStream {
-    to_html::compile(tokens, MacroMode::HtmlIn)
+pub fn html_ctx(tokens: TokenStream) -> TokenStream {
+    to_html::compile(tokens, MacroMode::HtmlContext)
 }
 
 #[proc_macro]
-pub fn html_async_in(tokens: TokenStream) -> TokenStream {
+pub fn html_async_ctx(tokens: TokenStream) -> TokenStream {
     to_html::compile(tokens, MacroMode::HtmlAsyncIn)
 }
 

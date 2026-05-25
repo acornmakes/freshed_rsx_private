@@ -1,4 +1,4 @@
-use freshed_rs_macros::{component, html, html_async_in};
+use freshed_rs_macros::{component, html, html_async_ctx};
 
 #[derive(Clone, Copy)]
 struct Ctx {
@@ -17,5 +17,5 @@ async fn row(ctx: Ctx, props: RowProps) -> String {
 }
 
 fn main() {
-    let _future = html_async_in!(Ctx { id: 9 }, <Row async>{"one"}</Row>);
+    let _future = html_async_ctx!(Ctx { id: 9 }, <Row async>{"one"}</Row>);
 }

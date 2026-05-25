@@ -1,4 +1,4 @@
-use freshed_rs_macros::html_in;
+use freshed_rs_macros::html_ctx;
 
 #[derive(Default)]
 pub struct PanelProps {
@@ -13,5 +13,5 @@ pub fn Panel(_ctx: i32, _props: PanelProps) -> String {
 fn main() {
     let ctx = 1;
     let text = "provided";
-    let _ = html_in!(ctx, <Panel children={text}>{"body"}</Panel>);
+    let _ = html_ctx!(ctx, <Panel children={text}>{"body"}</Panel>);
 }

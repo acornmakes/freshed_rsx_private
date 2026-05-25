@@ -1,4 +1,4 @@
-use freshed_rs_macros::{component, html_async_in};
+use freshed_rs_macros::{component, html_async_ctx};
 
 #[derive(Clone, Copy)]
 struct Ctx {
@@ -22,5 +22,5 @@ fn main() {
     let ctx = Ctx {
         request_id: "r-async",
     };
-    let _future = html_async_in!(ctx, <UserCard async>{"ok"}</UserCard>);
+    let _future = html_async_ctx!(ctx, <UserCard async>{"ok"}</UserCard>);
 }

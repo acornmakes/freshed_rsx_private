@@ -17,7 +17,7 @@ use syn::spanned::Spanned;
 pub(crate) enum MacroMode {
     Html,
     HtmlAsync,
-    HtmlIn,
+    HtmlContext,
     HtmlAsyncIn,
 }
 
@@ -31,15 +31,15 @@ pub(crate) enum CompileMode {
 
 impl MacroMode {
     fn requires_context_arg(self) -> bool {
-        matches!(self, Self::HtmlIn | Self::HtmlAsyncIn)
+        matches!(self, Self::HtmlContext | Self::HtmlAsyncIn)
     }
 
     fn macro_name(self) -> &'static str {
         match self {
             Self::Html => "html!",
             Self::HtmlAsync => "html_async!",
-            Self::HtmlIn => "html_in!",
-            Self::HtmlAsyncIn => "html_async_in!",
+            Self::HtmlContext => "html_ctx!",
+            Self::HtmlAsyncIn => "html_async_ctx!",
         }
     }
 
@@ -47,7 +47,7 @@ impl MacroMode {
         match self {
             Self::Html => CompileMode::SyncNoCtx,
             Self::HtmlAsync => CompileMode::AsyncNoCtx,
-            Self::HtmlIn => CompileMode::SyncWithCtx,
+            Self::HtmlContext => CompileMode::SyncWithCtx,
             Self::HtmlAsyncIn => CompileMode::AsyncWithCtx,
         }
     }
@@ -364,7 +364,7 @@ pub(crate) fn compile(tokens: proc_macro::TokenStream, mode: MacroMode) -> proc_
         Err(error) => return error.to_compile_error().into(),
     };
 
-    html_inner(
+    html_ctxner(
         parsed.context_expr,
         parsed.markup_tokens.into(),
         mode.compile_mode(),
@@ -624,7 +624,7 @@ where
                         .async_marker_span
                         .unwrap_or_else(|| element.open_tag.name.span()),
                     proc_macro2_diagnostics::Level::Error,
-                    "async component marker is only supported in html_async! and html_async_in!",
+                    "async component marker is only supported in html_async! and html_async_ctx!",
                 );
                 self.output
                     .diagnostics
@@ -796,7 +796,7 @@ fn trailing_garbage_diagnostics(nodes: &[Node]) -> Vec<proc_macro2::TokenStream>
 /// assert_eq!(html!(<div>"hello "{world}</div>), "<div>hello planet</div>");
 /// # }
 /// ```
-pub(crate) fn html_inner(
+pub(crate) fn html_ctxner(
     context_expr: Option<syn::Expr>,
     tokens: proc_macro::TokenStream,
     compile_mode: CompileMode,

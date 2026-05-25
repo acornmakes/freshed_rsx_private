@@ -1,4 +1,4 @@
-use freshed_rs_macros::{component, html, html_async, html_async_in, html_in};
+use freshed_rs_macros::{component, html, html_async, html_async_ctx, html_ctx};
 use freshed_rs_runtime::RawHtml;
 use futures::executor::block_on;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -427,31 +427,31 @@ fn html_async_handles_dynamic_attributes_and_children() {
 }
 
 #[test]
-fn html_in_accepts_context_argument_shape() {
+fn html_ctx_accepts_context_argument_shape() {
     let _ctx = 7usize;
-    let rendered = html_in!(_ctx, <div>{"ctx-shape"}</div>).to_string();
+    let rendered = html_ctx!(_ctx, <div>{"ctx-shape"}</div>).to_string();
     assert_eq!(rendered, "<div>ctx-shape</div>");
 }
 
 #[test]
-fn html_in_accepts_complex_context_expression() {
+fn html_ctx_accepts_complex_context_expression() {
     let _ctx = ("tenant-a", 99usize);
-    let rendered = html_in!((&_ctx, 1 + 2), <ul><li>{"one"}</li><li>{"two"}</li></ul>).to_string();
+    let rendered = html_ctx!((&_ctx, 1 + 2), <ul><li>{"one"}</li><li>{"two"}</li></ul>).to_string();
     assert_eq!(rendered, "<ul><li>one</li><li>two</li></ul>");
 }
 
 #[test]
-fn html_async_in_accepts_context_argument_shape() {
+fn html_async_ctx_accepts_context_argument_shape() {
     let _ctx = "request-context";
-    let rendered = block_on(html_async_in!(_ctx, <div>{"ctx-async-shape"}</div>)).to_string();
+    let rendered = block_on(html_async_ctx!(_ctx, <div>{"ctx-async-shape"}</div>)).to_string();
     assert_eq!(rendered, "<div>ctx-async-shape</div>");
 }
 
 #[test]
-fn html_async_in_accepts_complex_context_expression() {
+fn html_async_ctx_accepts_complex_context_expression() {
     let _ctx = ("session", 11usize);
     let rendered =
-        block_on(html_async_in!(Some(&_ctx), <table><tr><td>{"ok"}</td></tr></table>)).to_string();
+        block_on(html_async_ctx!(Some(&_ctx), <table><tr><td>{"ok"}</td></tr></table>)).to_string();
     assert_eq!(rendered, "<table><tr><td>ok</td></tr></table>");
 }
 
@@ -490,7 +490,7 @@ fn intrinsic_output_is_consistent_across_no_ctx_macro_modes() {
 fn intrinsic_output_is_consistent_across_ctx_macro_modes() {
     let _ctx = ("tenant", 4usize);
 
-    let sync_ctx = html_in!(
+    let sync_ctx = html_ctx!(
         &_ctx,
         <nav>
             <a href={"/"}>{"home"}</a>
@@ -498,7 +498,7 @@ fn intrinsic_output_is_consistent_across_ctx_macro_modes() {
         </nav>
     )
     .to_string();
-    let async_ctx = block_on(html_async_in!(
+    let async_ctx = block_on(html_async_ctx!(
         &_ctx,
         <nav>
             <a href={"/"}>{"home"}</a>
@@ -542,12 +542,12 @@ fn html_async_renders_component_like_uppercase_tag_shape() {
 }
 
 #[test]
-fn html_in_renders_component_like_uppercase_tag_shape_with_context() {
+fn html_ctx_renders_component_like_uppercase_tag_shape_with_context() {
     let ctx = RenderCtx {
         request_id: "req-17",
         tenant: "tenant-a",
     };
-    let rendered = html_in!(ctx, <CtxProfileBadge>{"ok"}</CtxProfileBadge>).to_string();
+    let rendered = html_ctx!(ctx, <CtxProfileBadge>{"ok"}</CtxProfileBadge>).to_string();
     assert_eq!(
         rendered,
         "<CtxProfileBadge tenant=\"tenant-a\">ok</CtxProfileBadge>"
@@ -555,13 +555,13 @@ fn html_in_renders_component_like_uppercase_tag_shape_with_context() {
 }
 
 #[test]
-fn html_async_in_renders_component_like_path_tag_shape_with_context() {
+fn html_async_ctx_renders_component_like_path_tag_shape_with_context() {
     let ctx = RenderCtx {
         request_id: "req-22",
         tenant: "tenant-a",
     };
     let rendered = block_on(
-        html_async_in!(ctx, <dashboard_ctx::Panel><span>{"ok"}</span></dashboard_ctx::Panel>),
+        html_async_ctx!(ctx, <dashboard_ctx::Panel><span>{"ok"}</span></dashboard_ctx::Panel>),
     )
     .to_string();
     assert_eq!(
@@ -571,13 +571,13 @@ fn html_async_in_renders_component_like_path_tag_shape_with_context() {
 }
 
 #[test]
-fn html_async_in_renders_async_component_from_snake_case_declaration_macro() {
+fn html_async_ctx_renders_async_component_from_snake_case_declaration_macro() {
     let ctx = RenderCtx {
         request_id: "req-snake-async",
         tenant: "tenant-snake",
     };
     let rendered =
-        block_on(html_async_in!(ctx, <CtxUserCard async>{"ok"}</CtxUserCard>)).to_string();
+        block_on(html_async_ctx!(ctx, <CtxUserCard async>{"ok"}</CtxUserCard>)).to_string();
     assert_eq!(
         rendered,
         "<CtxUserCard request-id=\"req-snake-async\">ok</CtxUserCard>"
@@ -591,9 +591,9 @@ fn intrinsic_custom_element_branch_remains_unchanged_across_macro_families() {
     let a = html!(<my-widget data-ready={true}>{"x"}</my-widget>).to_string();
     let b = html!(<my-widget data-ready={true}>{"x"}</my-widget>).to_string();
     let c = block_on(html_async!(<my-widget data-ready={true}>{"x"}</my-widget>)).to_string();
-    let d = html_in!(_ctx, <my-widget data-ready={true}>{"x"}</my-widget>).to_string();
+    let d = html_ctx!(_ctx, <my-widget data-ready={true}>{"x"}</my-widget>).to_string();
     let e =
-        block_on(html_async_in!(_ctx, <my-widget data-ready={true}>{"x"}</my-widget>)).to_string();
+        block_on(html_async_ctx!(_ctx, <my-widget data-ready={true}>{"x"}</my-widget>)).to_string();
 
     assert_eq!(a, "<my-widget data-ready=\"true\">x</my-widget>");
     assert_eq!(a, b);
@@ -636,7 +636,7 @@ fn html_async_component_props_support_literal_expr_and_shorthand_shapes() {
 }
 
 #[test]
-fn html_in_component_props_support_literal_expr_and_shorthand_shapes() {
+fn html_ctx_component_props_support_literal_expr_and_shorthand_shapes() {
     let ctx = RenderCtx {
         request_id: "req-99",
         tenant: "tenant-z",
@@ -644,7 +644,7 @@ fn html_in_component_props_support_literal_expr_and_shorthand_shapes() {
     let glyph = "Go";
     let priority = 1_i32;
     let rendered =
-        html_in!(ctx, <CtxMenuItem label="File" priority={priority} {glyph}>{"x"}</CtxMenuItem>)
+        html_ctx!(ctx, <CtxMenuItem label="File" priority={priority} {glyph}>{"x"}</CtxMenuItem>)
             .to_string();
     assert_eq!(
         rendered,
@@ -653,14 +653,14 @@ fn html_in_component_props_support_literal_expr_and_shorthand_shapes() {
 }
 
 #[test]
-fn html_async_in_component_props_support_literal_expr_and_shorthand_shapes() {
+fn html_async_ctx_component_props_support_literal_expr_and_shorthand_shapes() {
     let ctx = RenderCtx {
         request_id: "req-100",
         tenant: "tenant-async",
     };
     let badge = "admin";
     let level = 5_i32;
-    let rendered = block_on(html_async_in!(
+    let rendered = block_on(html_async_ctx!(
         ctx,
         <CtxAuthBadge role="owner" level={level} {badge}>{"ok"}</CtxAuthBadge>
     ))
@@ -672,33 +672,33 @@ fn html_async_in_component_props_support_literal_expr_and_shorthand_shapes() {
 }
 
 #[test]
-fn html_injects_empty_children_when_component_has_no_body() {
+fn html_ctxjects_empty_children_when_component_has_no_body() {
     let rendered = html!(<EmptyCard />).to_string();
     assert_eq!(rendered, "<EmptyCard></EmptyCard>");
 }
 
 #[test]
-fn html_injects_children_markup_when_component_has_body() {
+fn html_ctxjects_children_markup_when_component_has_body() {
     let rendered = html!(<Card><span>{"nested"}</span></Card>).to_string();
     assert_eq!(rendered, "<Card><span>nested</span></Card>");
 }
 
 #[test]
-fn html_async_injects_children_markup_when_component_has_body() {
+fn html_async_ctxjects_children_markup_when_component_has_body() {
     let rendered = block_on(html_async!(<Card><strong>{"nested"}</strong></Card>)).to_string();
     assert_eq!(rendered, "<Card><strong>nested</strong></Card>");
 }
 
 #[test]
-fn html_in_and_html_async_in_inject_children_markup_when_component_has_body() {
+fn html_ctx_and_html_async_ctx_inject_children_markup_when_component_has_body() {
     let ctx = RenderCtx {
         request_id: "req-3",
         tenant: "tenant-sync",
     };
 
-    let rendered_sync = html_in!(ctx, <CtxCard><em>{"sync"}</em></CtxCard>).to_string();
+    let rendered_sync = html_ctx!(ctx, <CtxCard><em>{"sync"}</em></CtxCard>).to_string();
     let rendered_async =
-        block_on(html_async_in!(ctx, <CtxCard><em>{"sync"}</em></CtxCard>)).to_string();
+        block_on(html_async_ctx!(ctx, <CtxCard><em>{"sync"}</em></CtxCard>)).to_string();
 
     assert_eq!(
         rendered_sync,
@@ -723,8 +723,8 @@ fn component_children_defaulting_is_consistent_across_all_macro_families() {
     let a = html!(<EmptyCard />).to_string();
     let b = html!(<EmptyCard />).to_string();
     let c = block_on(html_async!(<EmptyCard />)).to_string();
-    let d = html_in!(ctx, <CtxEmptyCard />).to_string();
-    let e = block_on(html_async_in!(ctx, <CtxEmptyCard />)).to_string();
+    let d = html_ctx!(ctx, <CtxEmptyCard />).to_string();
+    let e = block_on(html_async_ctx!(ctx, <CtxEmptyCard />)).to_string();
 
     assert_eq!(a, "<EmptyCard></EmptyCard>");
     assert_eq!(a, b);
@@ -747,9 +747,9 @@ fn path_component_children_injection_is_consistent_across_macro_families() {
     let b =
         block_on(html_async!(<dashboard::Panel><span>{"x"}</span></dashboard::Panel>)).to_string();
     let c =
-        html_in!(ctx, <dashboard_ctx::Panel><span>{"x"}</span></dashboard_ctx::Panel>).to_string();
+        html_ctx!(ctx, <dashboard_ctx::Panel><span>{"x"}</span></dashboard_ctx::Panel>).to_string();
     let d = block_on(
-        html_async_in!(ctx, <dashboard_ctx::Panel><span>{"x"}</span></dashboard_ctx::Panel>),
+        html_async_ctx!(ctx, <dashboard_ctx::Panel><span>{"x"}</span></dashboard_ctx::Panel>),
     )
     .to_string();
 
@@ -787,10 +787,10 @@ fn nested_component_children_are_composed_through_format_fragments() {
 }
 
 #[test]
-fn html_in_evaluates_context_expression_once_and_threads_to_nested_components() {
+fn html_ctx_evaluates_context_expression_once_and_threads_to_nested_components() {
     CTX_EVAL_COUNT.store(0, Ordering::SeqCst);
 
-    let rendered = html_in!(
+    let rendered = html_ctx!(
         make_eval_ctx(),
         <EvalWrapper>
             <EvalLeaf>{"A"}</EvalLeaf>
@@ -807,10 +807,10 @@ fn html_in_evaluates_context_expression_once_and_threads_to_nested_components() 
 }
 
 #[test]
-fn html_async_in_evaluates_context_expression_once_and_threads_to_nested_components() {
+fn html_async_ctx_evaluates_context_expression_once_and_threads_to_nested_components() {
     CTX_EVAL_COUNT.store(0, Ordering::SeqCst);
 
-    let rendered = block_on(html_async_in!(
+    let rendered = block_on(html_async_ctx!(
         make_eval_ctx(),
         <EvalWrapper>
             <EvalLeaf>{"X"}</EvalLeaf>
@@ -846,14 +846,14 @@ fn html_async_awaits_marked_async_components_and_preserves_render_order() {
 }
 
 #[test]
-fn html_async_in_awaits_marked_async_components_and_threads_context() {
+fn html_async_ctx_awaits_marked_async_components_and_threads_context() {
     RENDER_SEQUENCE.store(0, Ordering::SeqCst);
     let ctx = RenderCtx {
         request_id: "req-async-seq",
         tenant: "tenant-async-seq",
     };
 
-    let rendered = block_on(html_async_in!(
+    let rendered = block_on(html_async_ctx!(
         ctx,
         <main>
             <CtxSeqSync label="alpha" />
@@ -927,8 +927,8 @@ fn html_escapes_text_and_attribute_values_across_macro_families() {
         request_id: "req-escape",
         tenant: "tenant-escape",
     };
-    let sync_ctx = html_in!(ctx, <div title={title}>{text}</div>).to_string();
-    let async_ctx = block_on(html_async_in!(ctx, <div title={title}>{text}</div>)).to_string();
+    let sync_ctx = html_ctx!(ctx, <div title={title}>{text}</div>).to_string();
+    let async_ctx = block_on(html_async_ctx!(ctx, <div title={title}>{text}</div>)).to_string();
 
     assert_eq!(sync, expected);
     assert_eq!(ide, expected);
@@ -949,8 +949,8 @@ fn html_preserves_trusted_raw_html_wrapper_values() {
         request_id: "req-raw",
         tenant: "tenant-raw",
     };
-    let sync_ctx = html_in!(ctx, <div title={RawHtml::new("trusted & raw")}>{RawHtml::new("<strong>safe</strong>")}</div>).to_string();
-    let async_ctx = block_on(html_async_in!(ctx, <div title={RawHtml::new("trusted & raw")}>{RawHtml::new("<strong>safe</strong>")}</div>)).to_string();
+    let sync_ctx = html_ctx!(ctx, <div title={RawHtml::new("trusted & raw")}>{RawHtml::new("<strong>safe</strong>")}</div>).to_string();
+    let async_ctx = block_on(html_async_ctx!(ctx, <div title={RawHtml::new("trusted & raw")}>{RawHtml::new("<strong>safe</strong>")}</div>)).to_string();
 
     assert_eq!(sync, expected);
     assert_eq!(async_sync, expected);

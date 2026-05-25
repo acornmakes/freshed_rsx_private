@@ -46,8 +46,8 @@ Tasks:
 
 - [x] 1.1 Keep existing `html!` behavior unchanged.
 - [x] 1.2 Add `html_async!` proc macro entrypoint.
-- [x] 1.3 Add `html_in!` proc macro entrypoint (first argument is context expression).
-- [x] 1.4 Add `html_async_in!` proc macro entrypoint.
+- [x] 1.3 Add `html_ctx!` proc macro entrypoint (first argument is context expression).
+- [x] 1.4 Add `html_async_ctx!` proc macro entrypoint.
 - [x] 1.5 Route all entrypoints through a single internal compile function with mode flags.
 - [x] 1.6 Add `#[component]` declaration macro to support snake_case component function definitions.
 
@@ -64,7 +64,7 @@ Files:
 Tasks:
 
 - [x] 2.1 Introduce input parser type for all macro forms.
-- [x] 2.2 Parse context-first forms (`html_in!`, `html_async_in!`) as `(ctx_expr, rstml_tokens)`.
+- [x] 2.2 Parse context-first forms (`html_ctx!`, `html_async_ctx!`) as `(ctx_expr, rstml_tokens)`.
 - [x] 2.3 Parse context-free forms as `rstml_tokens` only.
 - [x] 2.4 Emit clear diagnostics for missing context argument in `_in` macros.
 - [x] 2.5 Reject trailing garbage tokens after parsed markup with precise spans.
@@ -252,7 +252,7 @@ Tasks:
 - [ ] 12.5 Positive: optional prop omitted.
 - [ ] 12.6 Positive: context propagation through nested tree.
 - [ ] 12.7 Positive: async component in `html_async!`.
-- [ ] 12.8 Positive: async component + context in `html_async_in!`.
+- [ ] 12.8 Positive: async component + context in `html_async_ctx!`.
 - [ ] 12.9 Negative: duplicate prop key.
 - [ ] 12.10 Negative: mixed `children` prop + body children.
 - [ ] 12.11 Negative: invalid shorthand block.
@@ -278,7 +278,7 @@ Tasks:
 
 - [ ] 13.1 Add minimal context-aware SSR example (db/session/user fields mocked).
 - [ ] 13.2 Add async SSR example with simulated IO.
-- [ ] 13.3 Document migration guidance from `html!` to `html_in!`.
+- [ ] 13.3 Document migration guidance from `html!` to `html_ctx!`.
 - [ ] 13.4 Document optional prop convention (`Option<T>` + `Default`).
 
 Exit criteria:

@@ -65,8 +65,8 @@ pub struct RenderContext<'a> {
 Macro entry forms:
 
 ```rust
-html_in!(ctx, <Page title="Home" />)
-html_async_in!(ctx, <UserCard async user_id={id} />).await
+html_ctx!(ctx, <Page title="Home" />)
+html_async_ctx!(ctx, <UserCard async user_id={id} />).await
 ```
 
 `html!` and `html_async!` remain available for context-free trees.
@@ -197,23 +197,23 @@ Two compile-time macros are defined:
 
 - `html!` for synchronous rendering.
 - `html_async!` for asynchronous SSR rendering.
-- `html_in!` for synchronous rendering with context injection.
-- `html_async_in!` for asynchronous SSR rendering with context injection.
+- `html_ctx!` for synchronous rendering with context injection.
+- `html_async_ctx!` for asynchronous SSR rendering with context injection.
 
 Mode rules:
 
 - `html!` supports intrinsic tags and sync component functions.
 - `html_async!` supports intrinsic tags, sync components, and async components.
-- `html_in!` supports intrinsic tags and sync components that take `ctx`.
-- `html_async_in!` supports intrinsic tags, sync components, and async components that take `ctx`.
+- `html_ctx!` supports intrinsic tags and sync components that take `ctx`.
+- `html_async_ctx!` supports intrinsic tags, sync components, and async components that take `ctx`.
 - `html_async!` expands to an async expression and must be awaited at call site.
-- `html_async_in!` expands to an async expression and must be awaited at call site.
+- `html_async_ctx!` expands to an async expression and must be awaited at call site.
 
 Example:
 
 ```rust
 let page = html_async!(<UserCard async user_id={id} />).await;
-let page = html_async_in!(ctx, <UserCard async user_id={id} />).await;
+let page = html_async_ctx!(ctx, <UserCard async user_id={id} />).await;
 ```
 
 ## 4. Compile-Time Expansion Model
@@ -232,7 +232,7 @@ For component nodes, emit a dynamic expression that calls the Rust function and 
 Async mode extension:
 
 - `html_async!` compiles the same node tree but generates an async block.
-- `html_in!` and `html_async_in!` additionally thread a `ctx` expression through each component call.
+- `html_ctx!` and `html_async_ctx!` additionally thread a `ctx` expression through each component call.
 - Component calls in async mode are awaited when component is marked async by syntax (see below).
 - Intrinsic nodes are still rendered directly into strings (no runtime DOM model).
 
@@ -389,8 +389,8 @@ Use `proc_macro2_diagnostics::Diagnostic::spanned` for macro-owned errors/warnin
 
 6. Context macro invoked without context argument
 
-- Example: `html_in!(<Page />)`
-- Message: `html_in! requires a context expression as first argument`
+- Example: `html_ctx!(<Page />)`
+- Message: `html_ctx! requires a context expression as first argument`
 - Span: macro input start.
 
 7. Context-aware component used in context-free macro
@@ -494,7 +494,7 @@ Future optional step:
 - Existing block interpolation behavior remains unchanged.
 - `html!` call sites without components are unaffected.
 - New async use-cases are additive via `html_async!`.
-- Context-aware rendering is additive via `html_in!`/`html_async_in!`.
+- Context-aware rendering is additive via `html_ctx!`/`html_async_ctx!`.
 
 ## 8.1 Modern SSR Concerns
 
@@ -528,7 +528,7 @@ Phase 3:
 
 - Add `html_async!` entrypoint and async rendering pipeline.
 - Add `async` component call marker parsing and `.await` expansion.
-- Add `html_in!` and `html_async_in!` entrypoints that thread context to all component calls.
+- Add `html_ctx!` and `html_async_ctx!` entrypoints that thread context to all component calls.
 
 Phase 4:
 
@@ -554,9 +554,9 @@ Positive tests:
 8. Omitted optional prop (`Option<T>`) defaults correctly.
 9. Async component render in `html_async!`.
 10. Mixed sync + async nested components in `html_async!`.
-11. Context propagation to direct child component (`html_in!`).
+11. Context propagation to direct child component (`html_ctx!`).
 12. Context propagation through deeply nested components.
-13. Async context propagation (`html_async_in!`).
+13. Async context propagation (`html_async_ctx!`).
 14. Omitted optional prop with context-aware component.
 
 Negative tests:
@@ -568,7 +568,7 @@ Negative tests:
 5. Missing required prop field (Rust error).
 6. Unknown component symbol (Rust error).
 7. Async marker in `html!` (macro error).
-8. Missing context argument in `html_in!`.
+8. Missing context argument in `html_ctx!`.
 9. Wrong context type supplied (Rust type error).
 
 ## 11. Example End State
@@ -603,7 +603,7 @@ pub fn button(_ctx: &RenderContext<'_>, props: ButtonProps) -> String {
 }
 
 let title = "Welcome".to_string();
-let out = html_in!(ctx,
+let out = html_ctx!(ctx,
     <Card {title}>
         <Button label="Save" />
         <span>Now</span>
@@ -625,7 +625,7 @@ pub async fn user_card(ctx: &RenderContext<'_>, props: user_card_props) -> Strin
     )
 }
 
-let async_out = html_async_in!(ctx,
+let async_out = html_async_ctx!(ctx,
     <UserCard async user_id={42}>
         <span>Online</span>
     </UserCard>

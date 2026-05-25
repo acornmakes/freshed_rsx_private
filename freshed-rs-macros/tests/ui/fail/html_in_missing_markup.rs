@@ -1,6 +1,6 @@
-use freshed_rs_macros::html_in;
+use freshed_rs_macros::html_ctx;
 
 fn main() {
     let ctx = 5;
-    let _ = html_in!(ctx,);
+    let _ = html_ctx!(ctx,);
 }

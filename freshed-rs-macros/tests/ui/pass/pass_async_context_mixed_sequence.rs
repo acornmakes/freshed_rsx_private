@@ -1,4 +1,4 @@
-use freshed_rs_macros::{component, html_async_in};
+use freshed_rs_macros::{component, html_async_ctx};
 
 #[derive(Clone, Copy)]
 struct Ctx {
@@ -26,7 +26,7 @@ async fn async_badge(ctx: Ctx, props: AsyncBadgeProps) -> String {
 
 fn main() {
     let ctx = Ctx { tenant: "t-1" };
-    let _future = html_async_in!(
+    let _future = html_async_ctx!(
         ctx,
         <section>
             <SyncBadge>{"A"}</SyncBadge>

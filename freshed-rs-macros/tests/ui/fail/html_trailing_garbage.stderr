@@ -1,0 +1,5 @@
+error: trailing non-markup tokens after parsed markup are not allowed
+ --> tests/ui/fail/html_trailing_garbage.rs:4:32
+  |
+4 |     let _ = html!(<div>ok</div>,);
+  |                                ^

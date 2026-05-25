@@ -62,11 +62,11 @@ Files:
 
 Tasks:
 
-- [ ] 2.1 Introduce input parser type for all macro forms.
-- [ ] 2.2 Parse context-first forms (`html_in!`, `html_async_in!`) as `(ctx_expr, rstml_tokens)`.
-- [ ] 2.3 Parse context-free forms as `rstml_tokens` only.
-- [ ] 2.4 Emit clear diagnostics for missing context argument in `_in` macros.
-- [ ] 2.5 Reject trailing garbage tokens after parsed markup with precise spans.
+- [x] 2.1 Introduce input parser type for all macro forms.
+- [x] 2.2 Parse context-first forms (`html_in!`, `html_async_in!`) as `(ctx_expr, rstml_tokens)`.
+- [x] 2.3 Parse context-free forms as `rstml_tokens` only.
+- [x] 2.4 Emit clear diagnostics for missing context argument in `_in` macros.
+- [x] 2.5 Reject trailing garbage tokens after parsed markup with precise spans.
 
 Exit criteria:
 

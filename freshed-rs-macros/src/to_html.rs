@@ -84,7 +84,10 @@ pub(crate) fn compile(tokens: proc_macro::TokenStream, mode: MacroMode) -> proc_
     html_inner(parsed.markup_tokens.into(), mode.ide_helper())
 }
 
-fn parse_macro_input(tokens: proc_macro::TokenStream, mode: MacroMode) -> syn::Result<ParsedMacroInput> {
+fn parse_macro_input(
+    tokens: proc_macro::TokenStream,
+    mode: MacroMode,
+) -> syn::Result<ParsedMacroInput> {
     let tokens: proc_macro2::TokenStream = tokens.into();
 
     if mode.requires_context_arg() {
@@ -101,9 +104,13 @@ fn parse_macro_input(tokens: proc_macro::TokenStream, mode: MacroMode) -> syn::R
         if parsed.markup_tokens.is_empty() {
             return Err(syn::Error::new(
                 proc_macro2::Span::call_site(),
-                format!("{} is missing markup after the context argument", mode.macro_name()),
+                format!(
+                    "{} is missing markup after the context argument",
+                    mode.macro_name()
+                ),
             ));
         }
+        reject_trailing_markup_garbage(&parsed.markup_tokens)?;
 
         return Ok(ParsedMacroInput {
             markup_tokens: parsed.markup_tokens,
@@ -111,9 +118,25 @@ fn parse_macro_input(tokens: proc_macro::TokenStream, mode: MacroMode) -> syn::R
     }
 
     let parsed = syn::parse2::<MarkupOnlyInput>(tokens)?;
+    reject_trailing_markup_garbage(&parsed.markup_tokens)?;
     Ok(ParsedMacroInput {
         markup_tokens: parsed.markup_tokens,
     })
+}
+
+fn reject_trailing_markup_garbage(markup_tokens: &proc_macro2::TokenStream) -> syn::Result<()> {
+    for token_tree in markup_tokens.clone() {
+        if let proc_macro2::TokenTree::Punct(punct) = token_tree {
+            if punct.as_char() == ',' {
+                return Err(syn::Error::new(
+                    punct.span(),
+                    "trailing non-markup tokens after parsed markup are not allowed",
+                ));
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[derive(Default)]
@@ -276,6 +299,29 @@ fn walk_nodes<'a>(empty_elements: &'a HashSet<&'a str>, nodes: &'a mut [Node]) -
     output.output
 }
 
+fn trailing_garbage_diagnostics(nodes: &[Node]) -> Vec<proc_macro2::TokenStream> {
+    let mut seen_non_text = false;
+    let mut diagnostics = Vec::new();
+
+    for node in nodes {
+        match node {
+            Node::Text(text) => {
+                if seen_non_text && !text.value_string().trim().is_empty() {
+                    let diagnostic = proc_macro2_diagnostics::Diagnostic::spanned(
+                        text.span(),
+                        proc_macro2_diagnostics::Level::Error,
+                        "trailing non-markup tokens after top-level markup are not allowed",
+                    );
+                    diagnostics.push(diagnostic.emit_as_expr_tokens());
+                }
+            }
+            _ => seen_non_text = true,
+        }
+    }
+
+    diagnostics
+}
+
 /// Converts HTML to `String`.
 ///
 /// Values returned from braced blocks `{}` are expected to return something
@@ -317,6 +363,7 @@ pub(crate) fn html_inner(
 
     let parser = Parser::new(config);
     let (mut nodes, errors) = parser.parse_recoverable(tokens).split_vec();
+    let trailing_diagnostics = trailing_garbage_diagnostics(&nodes);
 
     let WalkNodesOutput {
         static_format: html_string,
@@ -332,7 +379,8 @@ pub(crate) fn html_inner(
     let errors = errors
         .into_iter()
         .map(|e| e.emit_as_expr_tokens())
-        .chain(diagnostics);
+        .chain(diagnostics)
+        .chain(trailing_diagnostics);
     quote! {
         {
             // Make sure that "compile_error!(..);"  can be used in this context.

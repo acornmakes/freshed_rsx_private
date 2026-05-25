@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 
-use proc_macro::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
 use rstml::{
     Parser, ParserConfig,
@@ -192,19 +191,10 @@ fn walk_nodes<'a>(empty_elements: &'a HashSet<&'a str>, nodes: &'a mut [Node]) -
 /// assert_eq!(html!(<div>"hello "{world}</div>), "<div>hello planet</div>");
 /// # }
 /// ```
-#[proc_macro]
-pub fn html(tokens: TokenStream) -> TokenStream {
-    html_inner(tokens, false)
-}
-
-/// Same as html but also emit IDE helper statements.
-/// Open tests.rs in ide to see semantic highlight/goto def and docs.
-#[proc_macro]
-pub fn html_ide(tokens: TokenStream) -> TokenStream {
-    html_inner(tokens, true)
-}
-
-fn html_inner(tokens: TokenStream, ide_helper: bool) -> TokenStream {
+pub(crate) fn html_inner(
+    tokens: proc_macro::TokenStream,
+    ide_helper: bool,
+) -> proc_macro::TokenStream {
     // https://developer.mozilla.org/en-US/docs/Glossary/Empty_element
     let empty_elements: HashSet<_> = [
         "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param",
@@ -215,8 +205,7 @@ fn html_inner(tokens: TokenStream, ide_helper: bool) -> TokenStream {
     let config = ParserConfig::new()
         .recover_block(true)
         .always_self_closed_elements(empty_elements.clone())
-        .raw_text_elements(["script", "style"].into_iter().collect())
-        .macro_call_pattern(quote!(html! {%%}));
+        .raw_text_elements(["script", "style"].into_iter().collect());
 
     let parser = Parser::new(config);
     let (mut nodes, errors) = parser.parse_recoverable(tokens).split_vec();

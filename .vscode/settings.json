@@ -1,6 +1,7 @@
 {
   "cSpell.words": ["rstml"],
   "chat.tools.terminal.autoApprove": {
-    "cargo check": true
+    "cargo check": true,
+    "cargo test": true
   }
 }

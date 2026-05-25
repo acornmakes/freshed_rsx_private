@@ -13,3 +13,7 @@ proc-macro2.workspace=true
 proc-macro2-diagnostics.workspace=true
 quote.workspace=true
 syn_derive.workspace=true
+
+[dev-dependencies]
+insta = "1.43.2"
+trybuild = "1.0.114"

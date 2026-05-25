@@ -6,8 +6,116 @@ use rstml::{
     node::{Node, NodeAttribute, NodeName},
     visitor::{Visitor, visit_attributes, visit_nodes},
 };
+use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
+
+// Generated identifiers in macro expansions should use the `__fr_*` prefix.
+// This keeps expansion internals recognizable and minimizes collision risk.
 // mod escape;
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum MacroMode {
+    Html,
+    HtmlIde,
+    HtmlAsync,
+    HtmlIn,
+    HtmlAsyncIn,
+}
+
+impl MacroMode {
+    fn ide_helper(self) -> bool {
+        matches!(self, Self::HtmlIde)
+    }
+
+    fn requires_context_arg(self) -> bool {
+        matches!(self, Self::HtmlIn | Self::HtmlAsyncIn)
+    }
+
+    fn macro_name(self) -> &'static str {
+        match self {
+            Self::Html => "html!",
+            Self::HtmlIde => "html_ide!",
+            Self::HtmlAsync => "html_async!",
+            Self::HtmlIn => "html_in!",
+            Self::HtmlAsyncIn => "html_async_in!",
+        }
+    }
+}
+
+struct MarkupOnlyInput {
+    markup_tokens: proc_macro2::TokenStream,
+}
+
+impl Parse for MarkupOnlyInput {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        Ok(Self {
+            markup_tokens: input.parse()?,
+        })
+    }
+}
+
+struct CtxFirstInput {
+    #[allow(dead_code)]
+    ctx_expr: syn::Expr,
+    _comma: syn::Token![,],
+    markup_tokens: proc_macro2::TokenStream,
+}
+
+impl Parse for CtxFirstInput {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        Ok(Self {
+            ctx_expr: input.parse()?,
+            _comma: input.parse()?,
+            markup_tokens: input.parse()?,
+        })
+    }
+}
+
+struct ParsedMacroInput {
+    markup_tokens: proc_macro2::TokenStream,
+}
+
+pub(crate) fn compile(tokens: proc_macro::TokenStream, mode: MacroMode) -> proc_macro::TokenStream {
+    let parsed = match parse_macro_input(tokens, mode) {
+        Ok(parsed) => parsed,
+        Err(error) => return error.to_compile_error().into(),
+    };
+
+    html_inner(parsed.markup_tokens.into(), mode.ide_helper())
+}
+
+fn parse_macro_input(tokens: proc_macro::TokenStream, mode: MacroMode) -> syn::Result<ParsedMacroInput> {
+    let tokens: proc_macro2::TokenStream = tokens.into();
+
+    if mode.requires_context_arg() {
+        let parsed = syn::parse2::<CtxFirstInput>(tokens).map_err(|_| {
+            syn::Error::new(
+                proc_macro2::Span::call_site(),
+                format!(
+                    "{} expects input in the form: context_expr, <markup...>",
+                    mode.macro_name()
+                ),
+            )
+        })?;
+
+        if parsed.markup_tokens.is_empty() {
+            return Err(syn::Error::new(
+                proc_macro2::Span::call_site(),
+                format!("{} is missing markup after the context argument", mode.macro_name()),
+            ));
+        }
+
+        return Ok(ParsedMacroInput {
+            markup_tokens: parsed.markup_tokens,
+        });
+    }
+
+    let parsed = syn::parse2::<MarkupOnlyInput>(tokens)?;
+    Ok(ParsedMacroInput {
+        markup_tokens: parsed.markup_tokens,
+    })
+}
+
 #[derive(Default)]
 struct WalkNodesOutput {
     static_format: String,
@@ -178,7 +286,7 @@ fn walk_nodes<'a>(empty_elements: &'a HashSet<&'a str>, nodes: &'a mut [Node]) -
 /// # Example
 ///
 /// ```
-/// use rstml_to_string_macro::html;
+/// use freshed_rs_macros::html;
 /// // using this macro, one should write docs module on top level of crate.
 /// // Macro will link html tags to them.
 /// pub mod docs {

@@ -26,11 +26,11 @@ Implement in vertical slices so each stage compiles and adds test coverage.
 
 ## Phase 0: Prep and Baseline
 
-- [ ] 0.1 Add crate-level TODO/feature tracking note in macro crate comments for component pipeline.
-- [ ] 0.2 Add snapshot tests for current intrinsic behavior to prevent regressions.
-- [ ] 0.3 Add macro compile-fail test harness if not present (`trybuild` recommended).
-- [ ] 0.4 Define a short coding convention note for generated temp symbols (`__fr_*`).
-- [ ] 0.5 Ensure workspace tests run in one command and document it.
+- [x] 0.1 Add crate-level TODO/feature tracking note in macro crate comments for component pipeline.
+- [x] 0.2 Add snapshot tests for current intrinsic behavior to prevent regressions.
+- [x] 0.3 Add macro compile-fail test harness if not present (`trybuild` recommended).
+- [x] 0.4 Define a short coding convention note for generated temp symbols (`__fr_*`).
+- [x] 0.5 Ensure workspace tests run in one command and document it.
 
 Exit criteria:
 
@@ -44,11 +44,11 @@ Files:
 
 Tasks:
 
-- [ ] 1.1 Keep existing `html!` and `html_ide!` behavior unchanged.
-- [ ] 1.2 Add `html_async!` proc macro entrypoint.
-- [ ] 1.3 Add `html_in!` proc macro entrypoint (first argument is context expression).
-- [ ] 1.4 Add `html_async_in!` proc macro entrypoint.
-- [ ] 1.5 Route all entrypoints through a single internal compile function with mode flags.
+- [x] 1.1 Keep existing `html!` and `html_ide!` behavior unchanged.
+- [x] 1.2 Add `html_async!` proc macro entrypoint.
+- [x] 1.3 Add `html_in!` proc macro entrypoint (first argument is context expression).
+- [x] 1.4 Add `html_async_in!` proc macro entrypoint.
+- [x] 1.5 Route all entrypoints through a single internal compile function with mode flags.
 
 Exit criteria:
 

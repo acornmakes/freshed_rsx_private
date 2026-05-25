@@ -1,5 +1,0 @@
-error: children provided both as prop and as child nodes
-  --> tests/ui/fail/component_children_conflict_html_ide.rs:19:30
-   |
-19 |     let _ = html_ide!(<Panel children={text}>{"body"}</Panel>);
-   |                              ^^^^^^^^

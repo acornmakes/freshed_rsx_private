@@ -1,4 +1,4 @@
-use freshed_rs_macros::{component, html, html_async, html_async_in, html_ide, html_in};
+use freshed_rs_macros::{component, html, html_async, html_async_in, html_in};
 
 pub mod docs {
     pub fn element() {}
@@ -66,7 +66,7 @@ fn main() {
     let _ctx = RenderCtx { tenant: "acme" };
     let title = "Home";
     let _a = html!(<Header title={title}><h1>{title}</h1></Header>);
-    let _b = html_ide!(<div><span>{"x"}</span></div>);
+    let _b = html!(<div><span>{"x"}</span></div>);
     let _c = html_async!(<AsyncPanel async><article data-id={42}>{"body"}</article></AsyncPanel>);
     let _d =
         html_in!(_ctx, <CtxHeader title="Ctx"><ul><li>{"a"}</li><li>{"b"}</li></ul></CtxHeader>);

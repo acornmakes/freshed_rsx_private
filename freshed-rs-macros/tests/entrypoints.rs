@@ -1,4 +1,4 @@
-use freshed_rs_macros::{component, html, html_async, html_async_in, html_ide, html_in};
+use freshed_rs_macros::{component, html, html_async, html_async_in, html_in};
 use freshed_rs_runtime::RawHtml;
 use futures::executor::block_on;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -383,14 +383,14 @@ fn html_renders_nested_real_world_page_section() {
 }
 
 #[test]
-fn html_ide_preserves_html_behavior() {
-    let rendered = html_ide!(<div>hello</div>).to_string();
+fn html_preserves_html_behavior() {
+    let rendered = html!(<div>hello</div>).to_string();
     assert_eq!(rendered, "<div>hello</div>");
 }
 
 #[test]
-fn html_ide_handles_document_like_markup() {
-    let rendered = html_ide!(
+fn html_handles_document_like_markup() {
+    let rendered = html!(
         <!DOCTYPE html>
         <html>
             <head><title>{"A"}</title></head>
@@ -467,7 +467,7 @@ fn intrinsic_output_is_consistent_across_no_ctx_macro_modes() {
         </section>
     )
     .to_string();
-    let b = html_ide!(
+    let b = html!(
         <section data-count={count}>
             <h2>{headline}</h2>
             <p>{"Stable"}</p>
@@ -527,8 +527,8 @@ fn html_renders_component_from_snake_case_declaration_macro() {
 }
 
 #[test]
-fn html_ide_renders_component_like_path_tag_shape() {
-    let rendered = html_ide!(<ui::Button data_kind={"secondary"}>{"Open"}</ui::Button>).to_string();
+fn html_renders_component_like_path_tag_shape() {
+    let rendered = html!(<ui::Button data_kind={"secondary"}>{"Open"}</ui::Button>).to_string();
     assert_eq!(
         rendered,
         "<ui::Button data-kind=\"secondary\">Open</ui::Button>"
@@ -589,7 +589,7 @@ fn intrinsic_custom_element_branch_remains_unchanged_across_macro_families() {
     let _ctx = 1usize;
 
     let a = html!(<my-widget data-ready={true}>{"x"}</my-widget>).to_string();
-    let b = html_ide!(<my-widget data-ready={true}>{"x"}</my-widget>).to_string();
+    let b = html!(<my-widget data-ready={true}>{"x"}</my-widget>).to_string();
     let c = block_on(html_async!(<my-widget data-ready={true}>{"x"}</my-widget>)).to_string();
     let d = html_in!(_ctx, <my-widget data-ready={true}>{"x"}</my-widget>).to_string();
     let e =
@@ -615,9 +615,9 @@ fn html_component_props_support_literal_expr_and_shorthand_shapes() {
 }
 
 #[test]
-fn html_ide_component_props_support_children_named_property() {
+fn html_component_props_support_children_named_property() {
     let body = "Inline";
-    let rendered = html_ide!(<Panel children={body} title="Hello" />).to_string();
+    let rendered = html!(<Panel children={body} title="Hello" />).to_string();
     assert_eq!(rendered, "<Panel title=\"Hello\">Inline</Panel>");
 }
 
@@ -708,8 +708,8 @@ fn html_in_and_html_async_in_inject_children_markup_when_component_has_body() {
 }
 
 #[test]
-fn html_ide_injects_children_markup_when_component_has_body() {
-    let rendered = html_ide!(<Card><code>{"child"}</code></Card>).to_string();
+fn html_renders_nested_children_markup_when_component_has_body() {
+    let rendered = html!(<Card><code>{"child"}</code></Card>).to_string();
     assert_eq!(rendered, "<Card><code>child</code></Card>");
 }
 
@@ -721,7 +721,7 @@ fn component_children_defaulting_is_consistent_across_all_macro_families() {
     };
 
     let a = html!(<EmptyCard />).to_string();
-    let b = html_ide!(<EmptyCard />).to_string();
+    let b = html!(<EmptyCard />).to_string();
     let c = block_on(html_async!(<EmptyCard />)).to_string();
     let d = html_in!(ctx, <CtxEmptyCard />).to_string();
     let e = block_on(html_async_in!(ctx, <CtxEmptyCard />)).to_string();
@@ -921,7 +921,7 @@ fn html_escapes_text_and_attribute_values_across_macro_families() {
     let expected = "<div title=\"A &amp; B &lt; C\">&lt;span&gt;5 &amp; 6 &quot;seven&quot; &#39;eight&#39;&lt;/span&gt;</div>";
 
     let sync = html!(<div title={title}>{text}</div>).to_string();
-    let ide = html_ide!(<div title={title}>{text}</div>).to_string();
+    let ide = html!(<div title={title}>{text}</div>).to_string();
     let async_sync = block_on(html_async!(<div title={title}>{text}</div>)).to_string();
     let ctx = RenderCtx {
         request_id: "req-escape",

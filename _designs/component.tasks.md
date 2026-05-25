@@ -44,7 +44,7 @@ Files:
 
 Tasks:
 
-- [x] 1.1 Keep existing `html!` and `html_ide!` behavior unchanged.
+- [x] 1.1 Keep existing `html!` behavior unchanged.
 - [x] 1.2 Add `html_async!` proc macro entrypoint.
 - [x] 1.3 Add `html_in!` proc macro entrypoint (first argument is context expression).
 - [x] 1.4 Add `html_async_in!` proc macro entrypoint.
@@ -227,7 +227,7 @@ Files:
 
 Tasks:
 
-- [ ] 11.1 Keep existing intrinsic semantic/docs helper behavior (`html_ide!`).
+- [x] 11.1 Remove the separate IDE helper macro and keep shared HTML behavior in `html!`.
 - [ ] 11.2 Ensure component-related diagnostics include tag/prop names.
 - [ ] 11.3 Ensure all macro-owned diagnostics use source spans from original syntax.
 - [ ] 11.4 Add diagnostics for malformed context macro invocations.

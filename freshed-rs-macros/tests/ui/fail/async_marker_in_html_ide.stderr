@@ -1,5 +1,0 @@
-error: async component marker is only supported in html_async! and html_async_in!
-  --> tests/ui/fail/async_marker_in_html_ide.rs:18:33
-   |
-18 |     let _ = html_ide!(<UserCard async>{"x"}</UserCard>);
-   |                                 ^^^^^

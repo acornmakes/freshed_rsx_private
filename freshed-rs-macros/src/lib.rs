@@ -264,12 +264,6 @@ pub fn html(tokens: TokenStream) -> TokenStream {
     to_html::compile(tokens, MacroMode::Html)
 }
 
-/// Same as html but also emit IDE helper statements.
-#[proc_macro]
-pub fn html_ide(tokens: TokenStream) -> TokenStream {
-    to_html::compile(tokens, MacroMode::HtmlIde)
-}
-
 #[proc_macro]
 pub fn html_async(tokens: TokenStream) -> TokenStream {
     to_html::compile(tokens, MacroMode::HtmlAsync)

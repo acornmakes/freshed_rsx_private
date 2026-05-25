@@ -16,7 +16,6 @@ use syn::spanned::Spanned;
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum MacroMode {
     Html,
-    HtmlIde,
     HtmlAsync,
     HtmlIn,
     HtmlAsyncIn,
@@ -31,10 +30,6 @@ pub(crate) enum CompileMode {
 }
 
 impl MacroMode {
-    fn ide_helper(self) -> bool {
-        matches!(self, Self::HtmlIde)
-    }
-
     fn requires_context_arg(self) -> bool {
         matches!(self, Self::HtmlIn | Self::HtmlAsyncIn)
     }
@@ -42,7 +37,6 @@ impl MacroMode {
     fn macro_name(self) -> &'static str {
         match self {
             Self::Html => "html!",
-            Self::HtmlIde => "html_ide!",
             Self::HtmlAsync => "html_async!",
             Self::HtmlIn => "html_in!",
             Self::HtmlAsyncIn => "html_async_in!",
@@ -51,7 +45,7 @@ impl MacroMode {
 
     fn compile_mode(self) -> CompileMode {
         match self {
-            Self::Html | Self::HtmlIde => CompileMode::SyncNoCtx,
+            Self::Html => CompileMode::SyncNoCtx,
             Self::HtmlAsync => CompileMode::AsyncNoCtx,
             Self::HtmlIn => CompileMode::SyncWithCtx,
             Self::HtmlAsyncIn => CompileMode::AsyncWithCtx,
@@ -354,7 +348,6 @@ pub(crate) fn compile(tokens: proc_macro::TokenStream, mode: MacroMode) -> proc_
         parsed.context_expr,
         parsed.markup_tokens.into(),
         mode.compile_mode(),
-        mode.ide_helper(),
     )
 }
 
@@ -787,7 +780,6 @@ pub(crate) fn html_inner(
     context_expr: Option<syn::Expr>,
     tokens: proc_macro::TokenStream,
     compile_mode: CompileMode,
-    ide_helper: bool,
 ) -> proc_macro::TokenStream {
     // https://developer.mozilla.org/en-US/docs/Glossary/Empty_element
     let empty_elements: HashSet<_> = [
@@ -813,7 +805,7 @@ pub(crate) fn html_inner(
 
     let WalkNodesOutput {
         fragments,
-        collected_elements: elements,
+        collected_elements: _elements,
         diagnostics,
     } = walk_nodes(
         compile_mode,
@@ -827,11 +819,6 @@ pub(crate) fn html_inner(
         collected_elements: Vec::new(),
     }
     .into_format_parts();
-    let docs = if ide_helper {
-        generate_tags_docs(&elements)
-    } else {
-        vec![]
-    };
     let errors = errors
         .into_iter()
         .map(|e| e.emit_as_expr_tokens())
@@ -882,35 +869,10 @@ pub(crate) fn html_inner(
         {
             // Make sure that "compile_error!(..);"  can be used in this context.
             #(#errors;)*
-            // Make sure that "enum x{};" and "let _x = crate::element;"  can be used in this context
-            #(#docs;)*
             #render_expr
         }
     }
     .into()
-}
-
-fn generate_tags_docs(elements: &[NodeName]) -> Vec<proc_macro2::TokenStream> {
-    // Mark some of elements as type,
-    // and other as elements as fn in crate::docs,
-    // to give an example how to link tag with docs.
-    let elements_as_type: HashSet<&'static str> = vec!["html", "head", "meta", "link", "body"]
-        .into_iter()
-        .collect();
-
-    elements
-        .into_iter()
-        .map(|e| {
-            if elements_as_type.contains(&*e.to_string()) {
-                let element = quote_spanned!(e.span() => enum);
-                quote!({#element X{}})
-            } else {
-                // let _ = crate::docs::element;
-                let element = quote_spanned!(e.span() => element);
-                quote!(let _ = crate::docs::#element)
-            }
-        })
-        .collect()
 }
 
 #[cfg(test)]

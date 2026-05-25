@@ -118,12 +118,12 @@ Files:
 
 Tasks:
 
-- [ ] 5.1 Parse `key="literal"` component attributes.
-- [ ] 5.2 Parse `key={expr}` component attributes.
-- [ ] 5.3 Parse shorthand `{ident}` into `ident={ident}`.
-- [ ] 5.4 Reject shorthand non-ident blocks (`{a + b}`) with targeted diagnostic.
-- [ ] 5.5 Detect duplicate prop keys and emit hard error.
-- [ ] 5.6 Reserve and track `children` key explicitly for conflict checks.
+- [x] 5.1 Parse `key="literal"` component attributes.
+- [x] 5.2 Parse `key={expr}` component attributes.
+- [x] 5.3 Parse shorthand `{ident}` into `ident={ident}`.
+- [x] 5.4 Reject shorthand non-ident blocks (`{a + b}`) with targeted diagnostic.
+- [x] 5.5 Detect duplicate prop keys and emit hard error.
+- [x] 5.6 Reserve and track `children` key explicitly for conflict checks.
 
 Exit criteria:
 
@@ -137,10 +137,10 @@ Files:
 
 Tasks:
 
-- [ ] 6.1 Compile child node list into string expression via existing static+values path.
-- [ ] 6.2 Inject `children` field when child nodes are present.
-- [ ] 6.3 Inject `children: String::new()` when absent and no explicit `children` prop.
-- [ ] 6.4 Emit hard error when both explicit `children` prop and child nodes are present.
+- [x] 6.1 Compile child node list into string expression via existing static+values path.
+- [x] 6.2 Inject `children` field when child nodes are present.
+- [x] 6.3 Inject `children: String::new()` when absent and no explicit `children` prop.
+- [x] 6.4 Emit hard error when both explicit `children` prop and child nodes are present.
 
 Exit criteria:
 
@@ -154,10 +154,10 @@ Files:
 
 Tasks:
 
-- [ ] 7.1 In `*_in` modes, emit component calls as `ComponentPath(ctx_expr, PropsPath { ... })`.
-- [ ] 7.2 In non-context modes, emit component calls as `ComponentPath(PropsPath { ... })`.
-- [ ] 7.3 Preserve hygienic capture of `ctx_expr` (single evaluation).
-- [ ] 7.4 Validate nested components automatically receive the same `ctx_expr`.
+- [x] 7.1 In `*_in` modes, emit component calls as `ComponentPath(ctx_expr, PropsPath { ... })`.
+- [x] 7.2 In non-context modes, emit component calls as `ComponentPath(PropsPath { ... })`.
+- [x] 7.3 Preserve hygienic capture of `ctx_expr` (single evaluation).
+- [x] 7.4 Validate nested components automatically receive the same `ctx_expr`.
 
 Exit criteria:
 

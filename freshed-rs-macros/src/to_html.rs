@@ -59,6 +59,12 @@ impl MacroMode {
     }
 }
 
+impl CompileMode {
+    fn uses_context(self) -> bool {
+        matches!(self, Self::SyncWithCtx | Self::AsyncWithCtx)
+    }
+}
+
 struct MarkupOnlyInput {
     markup_tokens: proc_macro2::TokenStream,
 }
@@ -89,6 +95,7 @@ impl Parse for CtxFirstInput {
 }
 
 struct ParsedMacroInput {
+    context_expr: Option<syn::Expr>,
     markup_tokens: proc_macro2::TokenStream,
 }
 
@@ -96,6 +103,21 @@ struct ParsedMacroInput {
 struct ComponentTagPaths {
     component_fn_path: syn::Path,
     props_type_path: syn::Path,
+}
+
+#[derive(Clone)]
+struct ParsedComponentProp {
+    key: String,
+    key_span: proc_macro2::Span,
+    value_tokens: proc_macro2::TokenStream,
+}
+
+#[derive(Default)]
+struct ParsedComponentProps {
+    props: Vec<ParsedComponentProp>,
+    has_children_prop: bool,
+    children_key_span: Option<proc_macro2::Span>,
+    diagnostics: Vec<proc_macro2::TokenStream>,
 }
 
 fn is_component_tag(name: &NodeName) -> bool {
@@ -140,6 +162,158 @@ fn respan_path(path: &mut syn::Path, span: proc_macro2::Span) {
     }
 }
 
+fn parse_component_props(
+    component_label: &str,
+    attributes: &mut [NodeAttribute],
+) -> ParsedComponentProps {
+    let mut parsed = ParsedComponentProps::default();
+    let mut seen_keys: HashSet<String> = HashSet::new();
+
+    for attribute in attributes {
+        match attribute {
+            NodeAttribute::Attribute(attribute) => {
+                let key = attribute.key.to_string();
+                if !seen_keys.insert(key.clone()) {
+                    let duplicate = proc_macro2_diagnostics::Diagnostic::spanned(
+                        attribute.key.span(),
+                        proc_macro2_diagnostics::Level::Error,
+                        format!(
+                            "duplicate property '{}' on component '{}'",
+                            key, component_label
+                        ),
+                    );
+                    parsed.diagnostics.push(duplicate.emit_as_expr_tokens());
+                    continue;
+                }
+
+                if key == "children" {
+                    parsed.has_children_prop = true;
+                    parsed.children_key_span = Some(attribute.key.span());
+                }
+
+                let value_tokens = attribute
+                    .value()
+                    .map(ToTokens::to_token_stream)
+                    .unwrap_or_else(|| quote!(true));
+
+                parsed.props.push(ParsedComponentProp {
+                    key,
+                    key_span: attribute.key.span(),
+                    value_tokens,
+                });
+            }
+            NodeAttribute::Block(block) => {
+                let block_expr_tokens = block.to_token_stream();
+                let shorthand_ident = shorthand_ident_from_block_expr(&block_expr_tokens);
+
+                let ident = match shorthand_ident {
+                    Some(ident) => ident,
+                    None => {
+                        let invalid = proc_macro2_diagnostics::Diagnostic::spanned(
+                            block.span(),
+                            proc_macro2_diagnostics::Level::Error,
+                            "component shorthand prop must be an identifier, e.g. {value}",
+                        );
+                        parsed.diagnostics.push(invalid.emit_as_expr_tokens());
+                        continue;
+                    }
+                };
+
+                let key = ident.to_string();
+                if !seen_keys.insert(key.clone()) {
+                    let duplicate = proc_macro2_diagnostics::Diagnostic::spanned(
+                        ident.span(),
+                        proc_macro2_diagnostics::Level::Error,
+                        format!(
+                            "duplicate property '{}' on component '{}'",
+                            key, component_label
+                        ),
+                    );
+                    parsed.diagnostics.push(duplicate.emit_as_expr_tokens());
+                    continue;
+                }
+
+                if key == "children" {
+                    parsed.has_children_prop = true;
+                    parsed.children_key_span = Some(ident.span());
+                }
+
+                parsed.props.push(ParsedComponentProp {
+                    key,
+                    key_span: ident.span(),
+                    value_tokens: ident.to_token_stream(),
+                });
+            }
+        }
+    }
+
+    parsed
+}
+
+fn shorthand_ident_from_block_expr(tokens: &proc_macro2::TokenStream) -> Option<syn::Ident> {
+    let expression = syn::parse2::<syn::Expr>(tokens.clone()).ok()?;
+
+    shorthand_ident_from_expr(&expression)
+}
+
+fn shorthand_ident_from_expr(expression: &syn::Expr) -> Option<syn::Ident> {
+    match expression {
+        syn::Expr::Path(path)
+            if path.qself.is_none()
+                && path.path.leading_colon.is_none()
+                && path.path.segments.len() == 1 =>
+        {
+            path.path.segments.first().map(|seg| seg.ident.clone())
+        }
+        syn::Expr::Block(block) => {
+            if block.block.stmts.len() != 1 {
+                return None;
+            }
+
+            match &block.block.stmts[0] {
+                syn::Stmt::Expr(inner, None) => shorthand_ident_from_expr(inner),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+fn build_format_expr_from_fragments(fragments: Vec<RenderFragment>) -> proc_macro2::TokenStream {
+    let (format_string, values) = WalkNodesOutput {
+        fragments,
+        diagnostics: Vec::new(),
+        collected_elements: Vec::new(),
+    }
+    .into_format_parts();
+
+    quote!(format!(#format_string, #(#values),*))
+}
+
+fn ident_from_prop_key(
+    key: &str,
+    key_span: proc_macro2::Span,
+) -> Result<syn::Ident, proc_macro2::TokenStream> {
+    match syn::parse_str::<syn::Ident>(key) {
+        Ok(ident) => {
+            let mut ident = ident;
+            ident.set_span(key_span);
+            Ok(ident)
+        }
+        Err(_) => {
+            let diagnostic = proc_macro2_diagnostics::Diagnostic::spanned(
+                key_span,
+                proc_macro2_diagnostics::Level::Error,
+                format!(
+                    "component property '{}' must be a valid Rust identifier",
+                    key
+                ),
+            );
+            Err(diagnostic.emit_as_expr_tokens())
+        }
+    }
+}
+
 pub(crate) fn compile(tokens: proc_macro::TokenStream, mode: MacroMode) -> proc_macro::TokenStream {
     let parsed = match parse_macro_input(tokens, mode) {
         Ok(parsed) => parsed,
@@ -147,6 +321,7 @@ pub(crate) fn compile(tokens: proc_macro::TokenStream, mode: MacroMode) -> proc_
     };
 
     html_inner(
+        parsed.context_expr,
         parsed.markup_tokens.into(),
         mode.compile_mode(),
         mode.ide_helper(),
@@ -182,6 +357,7 @@ fn parse_macro_input(
         reject_trailing_markup_garbage(&parsed.markup_tokens)?;
 
         return Ok(ParsedMacroInput {
+            context_expr: Some(parsed.ctx_expr),
             markup_tokens: parsed.markup_tokens,
         });
     }
@@ -189,6 +365,7 @@ fn parse_macro_input(
     let parsed = syn::parse2::<MarkupOnlyInput>(tokens)?;
     reject_trailing_markup_garbage(&parsed.markup_tokens)?;
     Ok(ParsedMacroInput {
+        context_expr: None,
         markup_tokens: parsed.markup_tokens,
     })
 }
@@ -228,6 +405,7 @@ enum RenderFragment {
 
 struct WalkNodes<'a> {
     compile_mode: CompileMode,
+    context_binding: Option<syn::Ident>,
     empty_elements: &'a HashSet<&'a str>,
     output: WalkNodesOutput,
 }
@@ -235,6 +413,7 @@ impl<'a> WalkNodes<'a> {
     fn child_output(&self) -> Self {
         Self {
             compile_mode: self.compile_mode,
+            context_binding: self.context_binding.clone(),
             empty_elements: self.empty_elements,
             output: WalkNodesOutput::default(),
         }
@@ -337,10 +516,94 @@ where
     fn visit_element(&mut self, element: &mut rstml::node::NodeElement<C>) -> bool {
         let name = element.name().to_string();
 
-        // Phase 4 classification hook. Rendering is unchanged until component
-        // expansion phases land.
+        // Component branch rendering is progressively expanded across phases.
         if let Some(paths) = component_paths(&element.open_tag.name) {
-            let _ = (&paths.component_fn_path, &paths.props_type_path);
+            let component_label = element.open_tag.name.to_string();
+            let mut parsed_props =
+                parse_component_props(&component_label, element.attributes_mut());
+
+            if parsed_props.has_children_prop && !element.children.is_empty() {
+                let span = parsed_props
+                    .children_key_span
+                    .unwrap_or_else(|| element.open_tag.name.span());
+                let conflict = proc_macro2_diagnostics::Diagnostic::spanned(
+                    span,
+                    proc_macro2_diagnostics::Level::Error,
+                    "children provided both as prop and as child nodes",
+                );
+                parsed_props
+                    .diagnostics
+                    .push(conflict.emit_as_expr_tokens());
+            }
+
+            let mut props_fields = Vec::new();
+            for prop in &parsed_props.props {
+                match ident_from_prop_key(&prop.key, prop.key_span) {
+                    Ok(ident) => {
+                        let value_tokens = prop.value_tokens.clone();
+                        props_fields.push(quote_spanned!(prop.key_span => #ident: #value_tokens));
+                    }
+                    Err(diagnostic) => parsed_props.diagnostics.push(diagnostic),
+                }
+            }
+
+            if !parsed_props.has_children_prop {
+                let children_expr = if element.children.is_empty() {
+                    quote!(::std::string::String::new())
+                } else {
+                    let child_visitor = self.child_output();
+                    let child_output = visit_nodes(&mut element.children, child_visitor);
+                    let WalkNodesOutput {
+                        fragments,
+                        diagnostics,
+                        collected_elements,
+                    } = child_output.output;
+                    self.output.diagnostics.extend(diagnostics);
+                    self.output.collected_elements.extend(collected_elements);
+                    build_format_expr_from_fragments(fragments)
+                };
+
+                props_fields
+                    .push(quote_spanned!(element.open_tag.name.span() => children: #children_expr));
+            }
+
+            self.output.diagnostics.extend(parsed_props.diagnostics);
+
+            let component_fn_path = paths.component_fn_path;
+            let props_type_path = paths.props_type_path;
+            let component_expr = if self.compile_mode.uses_context() {
+                if let Some(ctx_ident) = &self.context_binding {
+                    quote_spanned! { element.open_tag.name.span() =>
+                        #component_fn_path(
+                            #ctx_ident,
+                            #props_type_path {
+                                #(#props_fields,)*
+                            }
+                        )
+                    }
+                } else {
+                    let missing_ctx = proc_macro2_diagnostics::Diagnostic::spanned(
+                        element.open_tag.name.span(),
+                        proc_macro2_diagnostics::Level::Error,
+                        "internal error: missing context binding for *_in macro mode",
+                    );
+                    self.output
+                        .diagnostics
+                        .push(missing_ctx.emit_as_expr_tokens());
+                    quote!(::std::string::String::new())
+                }
+            } else {
+                quote_spanned! { element.open_tag.name.span() =>
+                    #component_fn_path(
+                        #props_type_path {
+                            #(#props_fields,)*
+                        }
+                    )
+                }
+            };
+
+            self.output.push_expr(component_expr);
+            return false;
         }
 
         self.output.push_static(format!("<{}", name));
@@ -405,11 +668,13 @@ where
 }
 fn walk_nodes<'a>(
     compile_mode: CompileMode,
+    context_binding: Option<syn::Ident>,
     empty_elements: &'a HashSet<&'a str>,
     nodes: &'a mut [Node],
 ) -> WalkNodesOutput {
     let visitor = WalkNodes {
         compile_mode,
+        context_binding,
         empty_elements,
         output: WalkNodesOutput::default(),
     };
@@ -465,6 +730,7 @@ fn trailing_garbage_diagnostics(nodes: &[Node]) -> Vec<proc_macro2::TokenStream>
 /// # }
 /// ```
 pub(crate) fn html_inner(
+    context_expr: Option<syn::Expr>,
     tokens: proc_macro::TokenStream,
     compile_mode: CompileMode,
     ide_helper: bool,
@@ -485,11 +751,22 @@ pub(crate) fn html_inner(
     let (mut nodes, errors) = parser.parse_recoverable(tokens).split_vec();
     let trailing_diagnostics = trailing_garbage_diagnostics(&nodes);
 
+    let context_binding = if compile_mode.uses_context() {
+        Some(syn::Ident::new("__fr_ctx", proc_macro2::Span::call_site()))
+    } else {
+        None
+    };
+
     let WalkNodesOutput {
         fragments,
         collected_elements: elements,
         diagnostics,
-    } = walk_nodes(compile_mode, &empty_elements, &mut nodes);
+    } = walk_nodes(
+        compile_mode,
+        context_binding.clone(),
+        &empty_elements,
+        &mut nodes,
+    );
     let (html_string, values) = WalkNodesOutput {
         fragments,
         diagnostics: Vec::new(),
@@ -506,12 +783,27 @@ pub(crate) fn html_inner(
         .map(|e| e.emit_as_expr_tokens())
         .chain(diagnostics)
         .chain(trailing_diagnostics);
+    let context_binding_stmt = match (compile_mode.uses_context(), context_binding, context_expr) {
+        (true, Some(binding), Some(expr)) => quote!(let #binding = (#expr);),
+        (true, Some(binding), None) => {
+            let diagnostic = proc_macro2_diagnostics::Diagnostic::spanned(
+                proc_macro2::Span::call_site(),
+                proc_macro2_diagnostics::Level::Error,
+                "internal error: missing context expression for *_in macro mode",
+            );
+            let emitted = diagnostic.emit_as_expr_tokens();
+            quote!(#emitted; let #binding = ();)
+        }
+        _ => quote!(),
+    };
+
     quote! {
         {
             // Make sure that "compile_error!(..);"  can be used in this context.
             #(#errors;)*
             // Make sure that "enum x{};" and "let _x = crate::element;"  can be used in this context
             #(#docs;)*
+            #context_binding_stmt
             format!(#html_string, #(#values),*)
         }
     }
@@ -543,7 +835,7 @@ fn generate_tags_docs(elements: &[NodeName]) -> Vec<proc_macro2::TokenStream> {
 
 #[cfg(test)]
 mod tests {
-    use super::{component_paths, is_component_tag};
+    use super::{component_paths, is_component_tag, parse_component_props};
     use quote::ToTokens;
     use rstml::{Parser, ParserConfig, node::Node};
     use syn::spanned::Spanned;
@@ -558,6 +850,21 @@ mod tests {
             .into_iter()
             .find_map(|node| match node {
                 Node::Element(element) => Some(element.open_tag.name),
+                _ => None,
+            })
+            .expect("expected first element")
+    }
+
+    fn parse_first_element(markup: &str) -> rstml::node::NodeElement<rstml::node::Infallible> {
+        let tokens: proc_macro2::TokenStream = markup.parse().expect("valid markup tokens");
+        let parser = Parser::new(ParserConfig::new().recover_block(true));
+        let (nodes, errors) = parser.parse_recoverable(tokens).split_vec();
+        assert!(errors.is_empty(), "unexpected parse errors: {errors:?}");
+
+        nodes
+            .into_iter()
+            .find_map(|node| match node {
+                Node::Element(element) => Some(element),
                 _ => None,
             })
             .expect("expected first element")
@@ -634,5 +941,66 @@ mod tests {
 
         assert_eq!(fn_span, expected_span);
         assert_eq!(props_span, expected_span);
+    }
+
+    #[test]
+    fn parses_component_key_literal_and_expr_properties() {
+        let mut element = parse_first_element("<Button label=\"Save\" count={n}></Button>");
+        let component_label = element.open_tag.name.to_string();
+        let parsed = parse_component_props(&component_label, element.attributes_mut());
+
+        assert!(parsed.diagnostics.is_empty());
+        assert!(!parsed.has_children_prop);
+        assert_eq!(parsed.props.len(), 2);
+
+        assert_eq!(parsed.props[0].key, "label");
+        assert_eq!(parsed.props[0].value_tokens.to_string(), "\"Save\"");
+        assert_eq!(parsed.props[1].key, "count");
+        assert_eq!(parsed.props[1].value_tokens.to_string(), "{ n }");
+    }
+
+    #[test]
+    fn parses_component_shorthand_identifier_property() {
+        let mut element = parse_first_element("<Button {label}></Button>");
+        let component_label = element.open_tag.name.to_string();
+        let parsed = parse_component_props(&component_label, element.attributes_mut());
+
+        assert!(parsed.diagnostics.is_empty());
+        assert_eq!(parsed.props.len(), 1);
+        assert_eq!(parsed.props[0].key, "label");
+        assert_eq!(parsed.props[0].value_tokens.to_string(), "label");
+    }
+
+    #[test]
+    fn rejects_non_identifier_component_shorthand_expression() {
+        let mut element = parse_first_element("<Button {a + b}></Button>");
+        let component_label = element.open_tag.name.to_string();
+        let parsed = parse_component_props(&component_label, element.attributes_mut());
+
+        assert!(!parsed.diagnostics.is_empty());
+        assert!(parsed.props.is_empty());
+    }
+
+    #[test]
+    fn rejects_duplicate_component_property_names() {
+        let mut element = parse_first_element("<Button label=\"A\" label=\"B\"></Button>");
+        let component_label = element.open_tag.name.to_string();
+        let parsed = parse_component_props(&component_label, element.attributes_mut());
+
+        assert_eq!(parsed.props.len(), 1);
+        assert_eq!(parsed.props[0].key, "label");
+        assert!(!parsed.diagnostics.is_empty());
+    }
+
+    #[test]
+    fn tracks_children_component_property() {
+        let mut element = parse_first_element("<Button children={child_html}></Button>");
+        let component_label = element.open_tag.name.to_string();
+        let parsed = parse_component_props(&component_label, element.attributes_mut());
+
+        assert!(parsed.diagnostics.is_empty());
+        assert!(parsed.has_children_prop);
+        assert_eq!(parsed.props.len(), 1);
+        assert_eq!(parsed.props[0].key, "children");
     }
 }

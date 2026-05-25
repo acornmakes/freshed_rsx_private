@@ -1,0 +1,5 @@
+error: component shorthand prop must be an identifier, e.g. {value}
+  --> tests/ui/fail/component_shorthand_non_ident_html_in.rs:16:35
+   |
+16 |     let _ = html_in!(ctx, <Button {a + b}></Button>);
+   |                                   ^^^^^^^

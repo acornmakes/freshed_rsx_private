@@ -1,11 +1,10 @@
 use freshed_rs_macros::{component, html};
 
-pub struct WrapperProps {
-    pub children: String,
-}
+pub struct WrapperProps {}
 #[component]
 fn wrapper(props: WrapperProps) -> String {
-    format!("<Wrapper>{}</Wrapper>", props.children)
+    let _ = props;
+    "<Wrapper></Wrapper>".to_string()
 }
 
 fn main() {

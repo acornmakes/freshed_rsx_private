@@ -116,7 +116,7 @@ Required props type convention:
 - The generated PascalCase symbol expects `PascalCaseProps`.
 - If your declared props type is not already `PascalCaseProps`, the macro emits an alias.
 - Props type should be a Rust struct.
-- If component accepts children, props struct includes field `children`.
+- If component accepts children, mark the props struct with `#[with_children]` to inject a standard `children: String` field.
 - Optional props are declared as `Option<T>` and are omitted at call-sites when desired.
 
 Optional-prop contract:
@@ -131,7 +131,6 @@ Example:
 pub struct user_button_props {
     pub label: String,
     pub class: String,
-    pub children: String,
 }
 
 #[component]
@@ -613,7 +612,6 @@ let out = html_in!(ctx,
 
 pub struct user_card_props {
     pub user_id: i64,
-    pub children: String,
 }
 
 #[component]

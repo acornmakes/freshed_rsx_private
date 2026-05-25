@@ -6,7 +6,7 @@ mod to_html;
 
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::{FnArg, ItemFn, Pat, ReturnType, Type, TypePath};
+use syn::{Field, Fields, FnArg, ItemFn, ItemStruct, Pat, ReturnType, Type, TypePath};
 use to_html::MacroMode;
 
 fn to_pascal_case(source: &str) -> String {
@@ -72,6 +72,51 @@ fn extract_type(arg: &FnArg, arg_label: &str) -> Result<Type, TokenStream> {
     };
 
     Ok((*pat_type.ty).clone())
+}
+
+#[proc_macro_attribute]
+pub fn with_children(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let attr_tokens = proc_macro2::TokenStream::from(attr);
+    if !attr_tokens.is_empty() {
+        return syn::Error::new_spanned(attr_tokens, "#[with_children] does not accept arguments")
+            .to_compile_error()
+            .into();
+    }
+
+    let mut item_struct = match syn::parse::<ItemStruct>(item) {
+        Ok(item_struct) => item_struct,
+        Err(error) => return error.to_compile_error().into(),
+    };
+
+    let Fields::Named(fields_named) = &mut item_struct.fields else {
+        return syn::Error::new_spanned(
+            &item_struct,
+            "#[with_children] requires a struct with named fields",
+        )
+        .to_compile_error()
+        .into();
+    };
+
+    let already_has_children = fields_named.named.iter().any(|field| {
+        field
+            .ident
+            .as_ref()
+            .map(|ident| ident == "children")
+            .unwrap_or(false)
+    });
+
+    if !already_has_children {
+        fields_named.named.push(Field {
+            attrs: Vec::new(),
+            vis: syn::parse_quote!(pub),
+            mutability: syn::FieldMutability::None,
+            ident: Some(syn::Ident::new("children", proc_macro2::Span::call_site())),
+            colon_token: Some(Default::default()),
+            ty: syn::parse_quote!(::std::string::String),
+        });
+    }
+
+    quote!(#item_struct).into()
 }
 
 #[proc_macro_attribute]

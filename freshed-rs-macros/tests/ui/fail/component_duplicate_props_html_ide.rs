@@ -2,7 +2,6 @@ use freshed_rs_macros::html_ide;
 
 pub struct ButtonProps {
     pub label: &'static str,
-    pub children: String,
 }
 
 #[allow(non_snake_case)]

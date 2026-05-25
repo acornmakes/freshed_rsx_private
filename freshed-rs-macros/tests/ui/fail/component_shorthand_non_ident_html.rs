@@ -1,8 +1,6 @@
 use freshed_rs_macros::html;
 
-pub struct ButtonProps {
-    pub children: String,
-}
+pub struct ButtonProps {}
 
 #[allow(non_snake_case)]
 pub fn Button(_props: ButtonProps) -> String {

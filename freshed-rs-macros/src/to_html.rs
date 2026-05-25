@@ -577,22 +577,18 @@ where
                 }
             }
 
-            if !parsed_props.has_children_prop {
-                let children_expr = if element.children.is_empty() {
-                    quote!(::std::string::String::new())
-                } else {
-                    let child_visitor = self.child_output();
-                    let child_output = visit_nodes(&mut element.children, child_visitor);
-                    let WalkNodesOutput {
-                        fragments,
-                        diagnostics,
-                        collected_elements,
-                    } = child_output.output;
-                    self.output.diagnostics.extend(diagnostics);
-                    self.output.collected_elements.extend(collected_elements);
-                    build_format_expr_from_fragments(fragments)
-                };
+            if !parsed_props.has_children_prop && !element.children.is_empty() {
+                let child_visitor = self.child_output();
+                let child_output = visit_nodes(&mut element.children, child_visitor);
+                let WalkNodesOutput {
+                    fragments,
+                    diagnostics,
+                    collected_elements,
+                } = child_output.output;
+                self.output.diagnostics.extend(diagnostics);
+                self.output.collected_elements.extend(collected_elements);
 
+                let children_expr = build_format_expr_from_fragments(fragments);
                 props_fields
                     .push(quote_spanned!(element.open_tag.name.span() => children: #children_expr));
             }

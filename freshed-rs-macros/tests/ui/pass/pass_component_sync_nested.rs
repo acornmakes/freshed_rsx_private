@@ -10,11 +10,10 @@ pub fn card(props: CardProps) -> String {
 
 pub struct ItemProps {
     pub label: &'static str,
-    pub children: String,
 }
 #[component]
 pub fn item(props: ItemProps) -> String {
-    format!("<Item label=\"{}\">{}</Item>", props.label, props.children)
+    format!("<Item label=\"{}\"></Item>", props.label)
 }
 
 fn main() {

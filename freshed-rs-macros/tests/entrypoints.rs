@@ -15,6 +15,22 @@ pub fn card(props: CardProps) -> String {
     format!("<Card>{}</Card>", props.children)
 }
 
+pub struct EmptyCardProps;
+
+#[component]
+pub fn empty_card(props: EmptyCardProps) -> String {
+    let _ = props;
+    "<EmptyCard></EmptyCard>".to_string()
+}
+
+pub struct CtxEmptyCardProps;
+
+#[component]
+pub fn ctx_empty_card(ctx: RenderCtx, props: CtxEmptyCardProps) -> String {
+    let _ = props;
+    format!("<CtxEmptyCard request-id=\"{}\"></CtxEmptyCard>", ctx.request_id)
+}
+
 #[allow(non_camel_case_types)]
 pub struct user_card_props {
     pub children: String,
@@ -263,21 +279,19 @@ static RENDER_SEQUENCE: AtomicUsize = AtomicUsize::new(0);
 
 pub struct SeqSyncProps {
     pub label: &'static str,
-    pub children: String,
 }
 
 #[component]
 pub fn seq_sync(props: SeqSyncProps) -> String {
     let order = RENDER_SEQUENCE.fetch_add(1, Ordering::SeqCst);
     format!(
-        "<SeqSync label=\"{}\" order=\"{}\">{}</SeqSync>",
-        props.label, order, props.children
+        "<SeqSync label=\"{}\" order=\"{}\"></SeqSync>",
+        props.label, order
     )
 }
 
 pub struct SeqAsyncProps {
     pub label: &'static str,
-    pub children: String,
 }
 
 #[component]
@@ -285,28 +299,26 @@ pub async fn seq_async(props: SeqAsyncProps) -> String {
     let () = async {}.await;
     let order = RENDER_SEQUENCE.fetch_add(1, Ordering::SeqCst);
     format!(
-        "<SeqAsync label=\"{}\" order=\"{}\">{}</SeqAsync>",
-        props.label, order, props.children
+        "<SeqAsync label=\"{}\" order=\"{}\"></SeqAsync>",
+        props.label, order
     )
 }
 
 pub struct CtxSeqSyncProps {
     pub label: &'static str,
-    pub children: String,
 }
 
 #[component]
 pub fn ctx_seq_sync(ctx: RenderCtx, props: CtxSeqSyncProps) -> String {
     let order = RENDER_SEQUENCE.fetch_add(1, Ordering::SeqCst);
     format!(
-        "<CtxSeqSync tenant=\"{}\" label=\"{}\" order=\"{}\">{}</CtxSeqSync>",
-        ctx.tenant, props.label, order, props.children
+        "<CtxSeqSync tenant=\"{}\" label=\"{}\" order=\"{}\"></CtxSeqSync>",
+        ctx.tenant, props.label, order
     )
 }
 
 pub struct CtxSeqAsyncProps {
     pub label: &'static str,
-    pub children: String,
 }
 
 #[component]
@@ -314,8 +326,8 @@ pub async fn ctx_seq_async(ctx: RenderCtx, props: CtxSeqAsyncProps) -> String {
     let () = async {}.await;
     let order = RENDER_SEQUENCE.fetch_add(1, Ordering::SeqCst);
     format!(
-        "<CtxSeqAsync request-id=\"{}\" label=\"{}\" order=\"{}\">{}</CtxSeqAsync>",
-        ctx.request_id, props.label, order, props.children
+        "<CtxSeqAsync request-id=\"{}\" label=\"{}\" order=\"{}\"></CtxSeqAsync>",
+        ctx.request_id, props.label, order
     )
 }
 
@@ -633,8 +645,8 @@ fn html_async_in_component_props_support_literal_expr_and_shorthand_shapes() {
 
 #[test]
 fn html_injects_empty_children_when_component_has_no_body() {
-    let rendered = html!(<Card></Card>).to_string();
-    assert_eq!(rendered, "<Card></Card>");
+    let rendered = html!(<EmptyCard />).to_string();
+    assert_eq!(rendered, "<EmptyCard></EmptyCard>");
 }
 
 #[test]
@@ -680,16 +692,16 @@ fn component_children_defaulting_is_consistent_across_all_macro_families() {
         tenant: "tenant-default",
     };
 
-    let a = html!(<Card></Card>).to_string();
-    let b = html_ide!(<Card></Card>).to_string();
-    let c = block_on(html_async!(<Card></Card>)).to_string();
-    let d = html_in!(ctx, <CtxCard></CtxCard>).to_string();
-    let e = block_on(html_async_in!(ctx, <CtxCard></CtxCard>)).to_string();
+    let a = html!(<EmptyCard />).to_string();
+    let b = html_ide!(<EmptyCard />).to_string();
+    let c = block_on(html_async!(<EmptyCard />)).to_string();
+    let d = html_in!(ctx, <CtxEmptyCard />).to_string();
+    let e = block_on(html_async_in!(ctx, <CtxEmptyCard />)).to_string();
 
-    assert_eq!(a, "<Card></Card>");
+    assert_eq!(a, "<EmptyCard></EmptyCard>");
     assert_eq!(a, b);
     assert_eq!(a, c);
-    assert_eq!(d, "<CtxCard request-id=\"req-default\"></CtxCard>");
+    assert_eq!(d, "<CtxEmptyCard request-id=\"req-default\"></CtxEmptyCard>");
     assert_eq!(d, e);
 }
 
@@ -828,7 +840,6 @@ fn html_async_in_awaits_marked_async_components_and_threads_context() {
 
 pub struct BoardGameProps<'a> {
     pub name: &'a str,
-    pub children: String,
 }
 
 #[component]

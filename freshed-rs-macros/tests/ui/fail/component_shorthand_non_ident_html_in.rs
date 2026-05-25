@@ -1,7 +1,6 @@
 use freshed_rs_macros::html_in;
 
 pub struct ButtonProps {
-    pub children: String,
 }
 
 #[allow(non_snake_case)]

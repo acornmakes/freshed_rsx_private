@@ -104,6 +104,12 @@ struct ComponentTagPaths {
 }
 
 #[derive(Clone)]
+struct ComponentSymbolHint {
+    component_fn_path: syn::Path,
+    props_type_path: syn::Path,
+}
+
+#[derive(Clone)]
 struct ParsedComponentProp {
     key: String,
     key_span: proc_macro2::Span,
@@ -137,9 +143,7 @@ fn component_paths(name: &NodeName) -> Option<ComponentTagPaths> {
         return None;
     }
 
-    let source_span = name.span();
-    let mut component_fn_path: syn::Path = syn::parse_str(&name.to_string()).ok()?;
-    respan_path(&mut component_fn_path, source_span);
+    let component_fn_path: syn::Path = syn::parse2(name.to_token_stream()).ok()?;
 
     let mut props_type_path = component_fn_path.clone();
     let last_segment = props_type_path.segments.last_mut()?;
@@ -153,12 +157,6 @@ fn component_paths(name: &NodeName) -> Option<ComponentTagPaths> {
         component_fn_path,
         props_type_path,
     })
-}
-
-fn respan_path(path: &mut syn::Path, span: proc_macro2::Span) {
-    for segment in &mut path.segments {
-        segment.ident.set_span(span);
-    }
 }
 
 fn parse_component_props(
@@ -265,7 +263,7 @@ fn parse_component_props(
                 parsed.props.push(ParsedComponentProp {
                     key,
                     key_span: ident.span(),
-                    value_tokens: ident.to_token_stream(),
+                    value_tokens: quote_spanned!(ident.span()=> #ident),
                 });
             }
         }
@@ -275,9 +273,31 @@ fn parse_component_props(
 }
 
 fn shorthand_ident_from_block_expr(tokens: &proc_macro2::TokenStream) -> Option<syn::Ident> {
+    if let Some(ident) = shorthand_ident_from_raw_block_tokens(tokens) {
+        return Some(ident);
+    }
+
     let expression = syn::parse2::<syn::Expr>(tokens.clone()).ok()?;
 
     shorthand_ident_from_expr(&expression)
+}
+
+fn shorthand_ident_from_raw_block_tokens(tokens: &proc_macro2::TokenStream) -> Option<syn::Ident> {
+    let mut outer = tokens.clone().into_iter();
+    let group = match (outer.next(), outer.next()) {
+        (Some(proc_macro2::TokenTree::Group(group)), None)
+            if group.delimiter() == proc_macro2::Delimiter::Brace =>
+        {
+            group
+        }
+        _ => return None,
+    };
+
+    let mut inner = group.stream().into_iter();
+    match (inner.next(), inner.next()) {
+        (Some(proc_macro2::TokenTree::Ident(ident)), None) => Some(ident),
+        _ => None,
+    }
 }
 
 fn shorthand_ident_from_expr(expression: &syn::Expr) -> Option<syn::Ident> {
@@ -307,7 +327,7 @@ fn build_format_expr_from_fragments(fragments: Vec<RenderFragment>) -> proc_macr
     let (format_string, values) = WalkNodesOutput {
         fragments,
         diagnostics: Vec::new(),
-        collected_elements: Vec::new(),
+        component_symbol_hints: Vec::new(),
     }
     .into_format_parts();
 
@@ -414,11 +434,9 @@ struct WalkNodesOutput {
     fragments: Vec<RenderFragment>,
     // Additional diagnostic messages.
     diagnostics: Vec<proc_macro2::TokenStream>,
-    // Collect elements to provide semantic highlight based on element tag.
-    // No differences between open tag and closed tag.
-    // Also multiple tags with same name can be present,
-    // because we need to mark each of them.
-    collected_elements: Vec<NodeName>,
+    // Component symbols are emitted as no-op references so IDEs can navigate
+    // from JSX-like component tags to Rust definitions.
+    component_symbol_hints: Vec<ComponentSymbolHint>,
 }
 
 enum RenderFragment {
@@ -483,7 +501,7 @@ impl WalkNodesOutput {
         let WalkNodesOutput {
             fragments,
             diagnostics,
-            collected_elements,
+            component_symbol_hints,
         } = other;
 
         for fragment in fragments {
@@ -493,7 +511,7 @@ impl WalkNodesOutput {
             }
         }
         self.diagnostics.extend(diagnostics);
-        self.collected_elements.extend(collected_elements);
+        self.component_symbol_hints.extend(component_symbol_hints);
     }
 }
 impl<'a> syn::visit_mut::VisitMut for WalkNodes<'a> {}
@@ -543,6 +561,12 @@ where
 
         // Component branch rendering is progressively expanded across phases.
         if let Some(paths) = component_paths(&element.open_tag.name) {
+            self.output
+                .component_symbol_hints
+                .push(ComponentSymbolHint {
+                    component_fn_path: paths.component_fn_path.clone(),
+                    props_type_path: paths.props_type_path.clone(),
+                });
             let component_label = element.open_tag.name.to_string();
             let mut parsed_props =
                 parse_component_props(&component_label, element.attributes_mut());
@@ -578,10 +602,12 @@ where
                 let WalkNodesOutput {
                     fragments,
                     diagnostics,
-                    collected_elements,
+                    component_symbol_hints,
                 } = child_output.output;
                 self.output.diagnostics.extend(diagnostics);
-                self.output.collected_elements.extend(collected_elements);
+                self.output
+                    .component_symbol_hints
+                    .extend(component_symbol_hints);
 
                 let children_expr = build_format_expr_from_fragments(fragments);
                 props_fields
@@ -650,12 +676,6 @@ where
         }
 
         self.output.push_static(format!("<{}", name));
-        self.output
-            .collected_elements
-            .push(element.open_tag.name.clone());
-        if let Some(e) = &element.close_tag {
-            self.output.collected_elements.push(e.name.clone())
-        }
 
         let visitor = self.child_output();
         let attribute_visitor = visit_attributes(element.attributes_mut(), visitor);
@@ -805,7 +825,7 @@ pub(crate) fn html_inner(
 
     let WalkNodesOutput {
         fragments,
-        collected_elements: _elements,
+        component_symbol_hints,
         diagnostics,
     } = walk_nodes(
         compile_mode,
@@ -816,9 +836,23 @@ pub(crate) fn html_inner(
     let (html_string, values) = WalkNodesOutput {
         fragments,
         diagnostics: Vec::new(),
-        collected_elements: Vec::new(),
+        component_symbol_hints: Vec::new(),
     }
     .into_format_parts();
+    let component_hint_statements = component_symbol_hints.into_iter().flat_map(|hint| {
+        let component_fn_path = hint.component_fn_path;
+        let props_type_path = hint.props_type_path;
+        vec![
+            quote_spanned! { component_fn_path.span() =>
+                #[allow(unused)]
+                let _ = #component_fn_path;
+            },
+            quote_spanned! { props_type_path.span() =>
+                #[allow(unused)]
+                let _: ::core::option::Option<#props_type_path> = ::core::option::Option::None;
+            },
+        ]
+    });
     let errors = errors
         .into_iter()
         .map(|e| e.emit_as_expr_tokens())
@@ -869,6 +903,7 @@ pub(crate) fn html_inner(
         {
             // Make sure that "compile_error!(..);"  can be used in this context.
             #(#errors;)*
+            #(#component_hint_statements)*
             #render_expr
         }
     }

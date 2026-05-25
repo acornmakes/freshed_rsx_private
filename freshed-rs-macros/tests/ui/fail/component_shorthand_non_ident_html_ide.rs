@@ -1,5 +1,6 @@
 use freshed_rs_macros::html_ide;
 
+#[derive(Default)]
 pub struct ButtonProps {}
 
 #[allow(non_snake_case)]

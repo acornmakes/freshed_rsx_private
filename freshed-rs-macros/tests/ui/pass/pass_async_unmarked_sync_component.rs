@@ -1,5 +1,6 @@
 use freshed_rs_macros::{component, html_async};
 
+#[derive(Default)]
 pub struct BannerProps {
     pub children: String,
 }

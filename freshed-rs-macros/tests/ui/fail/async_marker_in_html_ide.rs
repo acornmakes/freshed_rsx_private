@@ -4,6 +4,7 @@ pub mod docs {
     pub fn element() {}
 }
 
+#[derive(Default)]
 pub struct UserCardProps {
     pub children: String,
 }

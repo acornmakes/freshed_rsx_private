@@ -3,6 +3,7 @@ use freshed_rs_macros::html_in;
 #[derive(Clone, Copy)]
 struct Ctx;
 
+#[derive(Default)]
 pub struct UserCardProps {
     pub children: String,
 }

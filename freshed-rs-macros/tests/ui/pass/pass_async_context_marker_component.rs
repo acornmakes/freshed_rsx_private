@@ -5,16 +5,22 @@ struct Ctx {
     request_id: &'static str,
 }
 
+#[derive(Default)]
 pub struct UserCardProps {
     pub children: String,
 }
 #[component]
 async fn user_card(ctx: Ctx, props: UserCardProps) -> String {
     let () = async {}.await;
-    format!("<UserCard req=\"{}\">{}</UserCard>", ctx.request_id, props.children)
+    format!(
+        "<UserCard req=\"{}\">{}</UserCard>",
+        ctx.request_id, props.children
+    )
 }
 
 fn main() {
-    let ctx = Ctx { request_id: "r-async" };
+    let ctx = Ctx {
+        request_id: "r-async",
+    };
     let _future = html_async_in!(ctx, <UserCard async>{"ok"}</UserCard>);
 }

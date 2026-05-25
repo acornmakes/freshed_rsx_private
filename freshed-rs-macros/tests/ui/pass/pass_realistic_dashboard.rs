@@ -5,6 +5,7 @@ struct Ctx {
     tenant: &'static str,
 }
 
+#[derive(Default)]
 pub struct HeaderProps {
     pub title: &'static str,
     pub children: String,
@@ -14,6 +15,7 @@ fn header(props: HeaderProps) -> String {
     format!("<Header title=\"{}\">{}</Header>", props.title, props.children)
 }
 
+#[derive(Default)]
 pub struct CtxHeaderProps {
     pub title: &'static str,
     pub children: String,
@@ -23,6 +25,7 @@ fn ctx_header(ctx: Ctx, props: CtxHeaderProps) -> String {
     format!("<CtxHeader tenant=\"{}\" title=\"{}\">{}</CtxHeader>", ctx.tenant, props.title, props.children)
 }
 
+#[derive(Default)]
 pub struct AsyncPanelProps {
     pub children: String,
 }
@@ -32,6 +35,7 @@ async fn async_panel(props: AsyncPanelProps) -> String {
     format!("<AsyncPanel>{}</AsyncPanel>", props.children)
 }
 
+#[derive(Default)]
 pub struct CtxAsyncPanelProps {
     pub children: String,
 }

@@ -5,6 +5,7 @@ struct Ctx {
     user: &'static str,
 }
 
+#[derive(Default)]
 pub struct BannerProps {
     pub children: String,
 }

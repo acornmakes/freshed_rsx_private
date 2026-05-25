@@ -1,5 +1,6 @@
 use freshed_rs_macros::{component, html};
 
+#[derive(Default)]
 pub struct WrapperProps {
     pub title: &'static str,
     pub children: &'static str,

@@ -5,6 +5,7 @@ struct Ctx {
     tenant: &'static str,
 }
 
+#[derive(Default)]
 pub struct SyncBadgeProps {
     pub children: String,
 }
@@ -13,6 +14,7 @@ fn sync_badge(ctx: Ctx, props: SyncBadgeProps) -> String {
     format!("<SyncBadge tenant=\"{}\">{}</SyncBadge>", ctx.tenant, props.children)
 }
 
+#[derive(Default)]
 pub struct AsyncBadgeProps {
     pub children: String,
 }

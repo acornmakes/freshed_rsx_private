@@ -1,5 +1,5 @@
 error: children provided both as prop and as child nodes
-  --> tests/ui/fail/component_children_conflict_html_in.rs:15:34
+  --> tests/ui/fail/component_children_conflict_html_in.rs:16:34
    |
-15 |     let _ = html_in!(ctx, <Panel children={text}>{"body"}</Panel>);
+16 |     let _ = html_in!(ctx, <Panel children={text}>{"body"}</Panel>);
    |                                  ^^^^^^^^

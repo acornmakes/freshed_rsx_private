@@ -5,6 +5,7 @@ struct Ctx {
     tenant: &'static str,
 }
 
+#[derive(Default)]
 pub struct ProfileProps {
     pub children: String,
 }

@@ -1,5 +1,6 @@
 use freshed_rs_macros::html_in;
 
+#[derive(Default)]
 pub struct ButtonProps {
     pub label: &'static str,
 }

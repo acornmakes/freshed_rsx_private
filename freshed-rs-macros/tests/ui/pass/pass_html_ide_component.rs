@@ -4,6 +4,7 @@ pub mod docs {
     pub fn element() {}
 }
 
+#[derive(Default)]
 pub struct HeroProps {
     pub children: String,
 }

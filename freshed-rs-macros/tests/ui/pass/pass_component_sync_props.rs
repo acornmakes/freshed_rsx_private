@@ -1,5 +1,6 @@
 use freshed_rs_macros::{component, html};
 
+#[derive(Default)]
 pub struct BadgeProps {
     pub tone: &'static str,
     pub children: String,

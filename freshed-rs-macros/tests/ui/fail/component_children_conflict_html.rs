@@ -1,5 +1,6 @@
 use freshed_rs_macros::html;
 
+#[derive(Default)]
 pub struct PanelProps {
     pub children: &'static str,
 }

@@ -1,5 +1,6 @@
 use freshed_rs_macros::{component, html_async};
 
+#[derive(Default)]
 pub struct SyncBadgeProps {
     pub children: String,
 }
@@ -8,6 +9,7 @@ fn sync_badge(props: SyncBadgeProps) -> String {
     format!("<SyncBadge>{}</SyncBadge>", props.children)
 }
 
+#[derive(Default)]
 pub struct AsyncBadgeProps {
     pub children: String,
 }

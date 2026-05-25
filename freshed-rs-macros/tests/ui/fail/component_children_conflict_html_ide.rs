@@ -4,6 +4,7 @@ pub mod docs {
     pub fn element() {}
 }
 
+#[derive(Default)]
 pub struct PanelProps {
     pub children: &'static str,
 }

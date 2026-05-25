@@ -540,7 +540,9 @@ where
         false
     }
     fn visit_block(&mut self, block: &mut rstml::node::NodeBlock) -> bool {
-        self.output.push_expr(block.to_token_stream());
+        self.output.push_expr(quote! {
+            ::freshed_rs_runtime::render_text((#block))
+        });
         false
     }
     fn visit_element(&mut self, element: &mut rstml::node::NodeElement<C>) -> bool {
@@ -624,6 +626,7 @@ where
                             #ctx_ident,
                             #props_type_path {
                                 #(#props_fields,)*
+                                ..::core::default::Default::default()
                             }
                         )#await_suffix
                     }
@@ -643,6 +646,7 @@ where
                     #component_fn_path(
                         #props_type_path {
                             #(#props_fields,)*
+                            ..::core::default::Default::default()
                         }
                     )#await_suffix
                 }
@@ -698,13 +702,17 @@ where
             NodeAttribute::Block(block) => {
                 // If the nodes parent is an attribute we prefix with whitespace
                 self.output.push_static(" ");
-                self.output.push_expr(block.to_token_stream());
+                self.output.push_expr(quote! {
+                    ::freshed_rs_runtime::render_attr((#block))
+                });
             }
             NodeAttribute::Attribute(attribute) => {
                 self.output.push_static(format!(" {}", attribute.key));
                 if let Some(value) = attribute.value() {
                     self.output.push_static("=\"");
-                    self.output.push_expr(value.to_token_stream());
+                    self.output.push_expr(quote! {
+                        ::freshed_rs_runtime::render_attr((#value))
+                    });
                     self.output.push_static("\"");
                 }
             }

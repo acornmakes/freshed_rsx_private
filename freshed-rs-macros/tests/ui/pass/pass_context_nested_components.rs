@@ -5,6 +5,7 @@ struct Ctx {
     request_id: &'static str,
 }
 
+#[derive(Default)]
 pub struct ShellProps {
     pub children: String,
 }
@@ -13,6 +14,7 @@ fn shell(ctx: Ctx, props: ShellProps) -> String {
     format!("<Shell req=\"{}\">{}</Shell>", ctx.request_id, props.children)
 }
 
+#[derive(Default)]
 pub struct TileProps {
     pub children: String,
 }

@@ -501,8 +501,8 @@ Future optional step:
 Security and correctness requirements:
 
 - All interpolated text values are HTML-escaped by default.
-- A dedicated explicit raw-html wrapper type (for trusted pre-sanitized content) is required for unescaped output.
-- Attribute context escaping and text-node escaping must be handled separately.
+- A dedicated explicit raw-html wrapper type (`freshed_rs_runtime::RawHtml`) is required for unescaped output.
+- Attribute context escaping and text-node escaping must be handled separately, but both use the same trusted runtime escape contract.
 - Macro-generated code must avoid accidental double-escaping for already-safe wrapper values.
 
 Async and latency requirements:

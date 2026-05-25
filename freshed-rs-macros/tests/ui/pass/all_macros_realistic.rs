@@ -9,6 +9,7 @@ struct RenderCtx {
     tenant: &'static str,
 }
 
+#[derive(Default)]
 pub struct HeaderProps {
     pub title: &'static str,
     pub children: String,
@@ -16,9 +17,13 @@ pub struct HeaderProps {
 
 #[component]
 fn header(props: HeaderProps) -> String {
-    format!("<Header title=\"{}\">{}</Header>", props.title, props.children)
+    format!(
+        "<Header title=\"{}\">{}</Header>",
+        props.title, props.children
+    )
 }
 
+#[derive(Default)]
 pub struct CtxHeaderProps {
     pub title: &'static str,
     pub children: String,
@@ -32,6 +37,7 @@ fn ctx_header(ctx: RenderCtx, props: CtxHeaderProps) -> String {
     )
 }
 
+#[derive(Default)]
 pub struct AsyncPanelProps {
     pub children: String,
 }
@@ -42,6 +48,7 @@ async fn async_panel(props: AsyncPanelProps) -> String {
     format!("<AsyncPanel>{}</AsyncPanel>", props.children)
 }
 
+#[derive(Default)]
 pub struct CtxAsyncPanelProps {
     pub children: String,
 }
@@ -61,6 +68,7 @@ fn main() {
     let _a = html!(<Header title={title}><h1>{title}</h1></Header>);
     let _b = html_ide!(<div><span>{"x"}</span></div>);
     let _c = html_async!(<AsyncPanel async><article data-id={42}>{"body"}</article></AsyncPanel>);
-    let _d = html_in!(_ctx, <CtxHeader title="Ctx"><ul><li>{"a"}</li><li>{"b"}</li></ul></CtxHeader>);
+    let _d =
+        html_in!(_ctx, <CtxHeader title="Ctx"><ul><li>{"a"}</li><li>{"b"}</li></ul></CtxHeader>);
     let _e = html_async_in!(_ctx, <CtxAsyncPanel async><table><tr><td>{"ok"}</td></tr></table></CtxAsyncPanel>);
 }

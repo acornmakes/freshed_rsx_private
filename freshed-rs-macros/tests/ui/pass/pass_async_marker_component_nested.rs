@@ -1,5 +1,6 @@
 use freshed_rs_macros::{component, html_async};
 
+#[derive(Default)]
 pub struct PanelProps {
     pub children: String,
 }
@@ -8,6 +9,7 @@ pub fn panel(props: PanelProps) -> String {
     format!("<Panel>{}</Panel>", props.children)
 }
 
+#[derive(Default)]
 pub struct UserCardProps {
     pub children: String,
 }

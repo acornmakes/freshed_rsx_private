@@ -1,7 +1,7 @@
 use freshed_rs_macros::html_async_in;
 
-pub struct ButtonProps {
-}
+#[derive(Default)]
+pub struct ButtonProps {}
 
 #[allow(non_snake_case)]
 pub fn Button(_ctx: i32, _props: ButtonProps) -> String {

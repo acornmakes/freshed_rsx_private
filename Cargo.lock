@@ -81,12 +81,14 @@ name = "freshed-rs-examples"
 version = "0.1.0"
 dependencies = [
  "freshed-rs-macros",
+ "freshed-rs-runtime",
 ]
 
 [[package]]
 name = "freshed-rs-macros"
 version = "0.1.0"
 dependencies = [
+ "freshed-rs-runtime",
  "futures",
  "insta",
  "proc-macro2",
@@ -97,6 +99,10 @@ dependencies = [
  "syn_derive",
  "trybuild",
 ]
+
+[[package]]
+name = "freshed-rs-runtime"
+version = "0.1.0"
 
 [[package]]
 name = "futures"

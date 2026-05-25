@@ -1,4 +1,5 @@
 use freshed_rs_macros::{component, html, html_async, html_async_in, html_ide, html_in};
+use freshed_rs_runtime::RawHtml;
 use futures::executor::block_on;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -6,6 +7,7 @@ pub mod docs {
     pub fn element() {}
 }
 
+#[derive(Default)]
 pub struct CardProps {
     pub children: String,
 }
@@ -15,6 +17,7 @@ pub fn card(props: CardProps) -> String {
     format!("<Card>{}</Card>", props.children)
 }
 
+#[derive(Default)]
 pub struct EmptyCardProps;
 
 #[component]
@@ -23,15 +26,20 @@ pub fn empty_card(props: EmptyCardProps) -> String {
     "<EmptyCard></EmptyCard>".to_string()
 }
 
+#[derive(Default)]
 pub struct CtxEmptyCardProps;
 
 #[component]
 pub fn ctx_empty_card(ctx: RenderCtx, props: CtxEmptyCardProps) -> String {
     let _ = props;
-    format!("<CtxEmptyCard request-id=\"{}\"></CtxEmptyCard>", ctx.request_id)
+    format!(
+        "<CtxEmptyCard request-id=\"{}\"></CtxEmptyCard>",
+        ctx.request_id
+    )
 }
 
 #[allow(non_camel_case_types)]
+#[derive(Default)]
 pub struct user_card_props {
     pub children: String,
 }
@@ -41,6 +49,7 @@ pub fn user_card(props: user_card_props) -> String {
     format!("<UserCard>{}</UserCard>", props.children)
 }
 
+#[derive(Default)]
 pub struct ProfileBadgeProps {
     pub children: String,
 }
@@ -50,6 +59,7 @@ pub fn profile_badge(props: ProfileBadgeProps) -> String {
     format!("<ProfileBadge>{}</ProfileBadge>", props.children)
 }
 
+#[derive(Default)]
 pub struct PanelProps {
     pub title: &'static str,
     pub children: &'static str,
@@ -63,6 +73,7 @@ pub fn panel(props: PanelProps) -> String {
     )
 }
 
+#[derive(Default)]
 pub struct FancyButtonProps {
     pub label: &'static str,
     pub rank: i32,
@@ -78,6 +89,7 @@ pub fn fancy_button(props: FancyButtonProps) -> String {
     )
 }
 
+#[derive(Default)]
 pub struct ActionButtonProps {
     pub count: i32,
     pub kind: &'static str,
@@ -93,6 +105,7 @@ pub fn action_button(props: ActionButtonProps) -> String {
     )
 }
 
+#[derive(Default)]
 pub struct MenuItemProps {
     pub label: &'static str,
     pub priority: i32,
@@ -108,6 +121,7 @@ pub fn menu_item(props: MenuItemProps) -> String {
     )
 }
 
+#[derive(Default)]
 pub struct AuthBadgeProps {
     pub role: &'static str,
     pub level: i32,
@@ -124,6 +138,7 @@ pub fn auth_badge(props: AuthBadgeProps) -> String {
 }
 
 pub mod ui {
+    #[derive(Default)]
     pub struct ButtonProps {
         pub data_kind: &'static str,
         pub children: String,
@@ -139,6 +154,7 @@ pub mod ui {
 }
 
 pub mod dashboard {
+    #[derive(Default)]
     pub struct PanelProps {
         pub children: String,
     }
@@ -155,6 +171,7 @@ pub struct RenderCtx {
     pub tenant: &'static str,
 }
 
+#[derive(Default)]
 pub struct CtxCardProps {
     pub children: String,
 }
@@ -168,6 +185,7 @@ pub fn ctx_card(ctx: RenderCtx, props: CtxCardProps) -> String {
 }
 
 #[allow(non_camel_case_types)]
+#[derive(Default)]
 pub struct ctx_user_card_props {
     pub children: String,
 }
@@ -181,6 +199,7 @@ pub async fn ctx_user_card(ctx: RenderCtx, props: ctx_user_card_props) -> String
     )
 }
 
+#[derive(Default)]
 pub struct CtxProfileBadgeProps {
     pub children: String,
 }
@@ -193,6 +212,7 @@ pub fn ctx_profile_badge(ctx: RenderCtx, props: CtxProfileBadgeProps) -> String 
     )
 }
 
+#[derive(Default)]
 pub struct CtxMenuItemProps {
     pub label: &'static str,
     pub priority: i32,
@@ -208,6 +228,7 @@ pub fn ctx_menu_item(ctx: RenderCtx, props: CtxMenuItemProps) -> String {
     )
 }
 
+#[derive(Default)]
 pub struct CtxAuthBadgeProps {
     pub role: &'static str,
     pub level: i32,
@@ -226,6 +247,7 @@ pub fn ctx_auth_badge(ctx: RenderCtx, props: CtxAuthBadgeProps) -> String {
 pub mod dashboard_ctx {
     use super::RenderCtx;
 
+    #[derive(Default)]
     pub struct PanelProps {
         pub children: String,
     }
@@ -251,6 +273,7 @@ fn make_eval_ctx() -> EvalCtx {
     EvalCtx { value: "ctx-once" }
 }
 
+#[derive(Default)]
 pub struct EvalLeafProps {
     pub children: String,
 }
@@ -263,6 +286,7 @@ pub fn eval_leaf(ctx: EvalCtx, props: EvalLeafProps) -> String {
     )
 }
 
+#[derive(Default)]
 pub struct EvalWrapperProps {
     pub children: String,
 }
@@ -277,6 +301,7 @@ pub fn eval_wrapper(ctx: EvalCtx, props: EvalWrapperProps) -> String {
 
 static RENDER_SEQUENCE: AtomicUsize = AtomicUsize::new(0);
 
+#[derive(Default)]
 pub struct SeqSyncProps {
     pub label: &'static str,
 }
@@ -290,6 +315,7 @@ pub fn seq_sync(props: SeqSyncProps) -> String {
     )
 }
 
+#[derive(Default)]
 pub struct SeqAsyncProps {
     pub label: &'static str,
 }
@@ -304,6 +330,7 @@ pub async fn seq_async(props: SeqAsyncProps) -> String {
     )
 }
 
+#[derive(Default)]
 pub struct CtxSeqSyncProps {
     pub label: &'static str,
 }
@@ -317,6 +344,7 @@ pub fn ctx_seq_sync(ctx: RenderCtx, props: CtxSeqSyncProps) -> String {
     )
 }
 
+#[derive(Default)]
 pub struct CtxSeqAsyncProps {
     pub label: &'static str,
 }
@@ -701,7 +729,10 @@ fn component_children_defaulting_is_consistent_across_all_macro_families() {
     assert_eq!(a, "<EmptyCard></EmptyCard>");
     assert_eq!(a, b);
     assert_eq!(a, c);
-    assert_eq!(d, "<CtxEmptyCard request-id=\"req-default\"></CtxEmptyCard>");
+    assert_eq!(
+        d,
+        "<CtxEmptyCard request-id=\"req-default\"></CtxEmptyCard>"
+    );
     assert_eq!(d, e);
 }
 
@@ -838,8 +869,24 @@ fn html_async_in_awaits_marked_async_components_and_threads_context() {
     );
 }
 
+#[derive(Default)]
 pub struct BoardGameProps<'a> {
     pub name: &'a str,
+}
+
+#[derive(Default)]
+pub struct OptionalBadgeProps {
+    pub tone: Option<&'static str>,
+    pub label: &'static str,
+}
+
+#[component]
+fn optional_badge(props: OptionalBadgeProps) -> String {
+    let tone = props.tone.unwrap_or("neutral");
+    format!(
+        "<OptionalBadge tone=\"{}\" label=\"{}\"></OptionalBadge>",
+        tone, props.label
+    )
 }
 
 #[component]
@@ -856,4 +903,57 @@ fn test_board_game() {
         "<div>Ticket to Ride</div>",
         html!(<BoardGame name={"Ticket to Ride"} />)
     )
+}
+
+#[test]
+fn optional_component_props_default_to_none() {
+    let rendered = html!(<OptionalBadge label="featured" />).to_string();
+    assert_eq!(
+        rendered,
+        "<OptionalBadge tone=\"neutral\" label=\"featured\"></OptionalBadge>"
+    );
+}
+
+#[test]
+fn html_escapes_text_and_attribute_values_across_macro_families() {
+    let text = "<span>5 & 6 \"seven\" 'eight'</span>";
+    let title = "A & B < C";
+    let expected = "<div title=\"A &amp; B &lt; C\">&lt;span&gt;5 &amp; 6 &quot;seven&quot; &#39;eight&#39;&lt;/span&gt;</div>";
+
+    let sync = html!(<div title={title}>{text}</div>).to_string();
+    let ide = html_ide!(<div title={title}>{text}</div>).to_string();
+    let async_sync = block_on(html_async!(<div title={title}>{text}</div>)).to_string();
+    let ctx = RenderCtx {
+        request_id: "req-escape",
+        tenant: "tenant-escape",
+    };
+    let sync_ctx = html_in!(ctx, <div title={title}>{text}</div>).to_string();
+    let async_ctx = block_on(html_async_in!(ctx, <div title={title}>{text}</div>)).to_string();
+
+    assert_eq!(sync, expected);
+    assert_eq!(ide, expected);
+    assert_eq!(async_sync, expected);
+    assert_eq!(sync_ctx, expected);
+    assert_eq!(async_ctx, expected);
+}
+
+#[test]
+fn html_preserves_trusted_raw_html_wrapper_values() {
+    let raw_text = RawHtml::new("<strong>safe</strong>");
+    let raw_attr = RawHtml::new("trusted & raw");
+    let expected = "<div title=\"trusted & raw\"><strong>safe</strong></div>";
+
+    let sync = html!(<div title={raw_attr}>{raw_text}</div>).to_string();
+    let async_sync = block_on(html_async!(<div title={RawHtml::new("trusted & raw")}>{RawHtml::new("<strong>safe</strong>")}</div>)).to_string();
+    let ctx = RenderCtx {
+        request_id: "req-raw",
+        tenant: "tenant-raw",
+    };
+    let sync_ctx = html_in!(ctx, <div title={RawHtml::new("trusted & raw")}>{RawHtml::new("<strong>safe</strong>")}</div>).to_string();
+    let async_ctx = block_on(html_async_in!(ctx, <div title={RawHtml::new("trusted & raw")}>{RawHtml::new("<strong>safe</strong>")}</div>)).to_string();
+
+    assert_eq!(sync, expected);
+    assert_eq!(async_sync, expected);
+    assert_eq!(sync_ctx, expected);
+    assert_eq!(async_ctx, expected);
 }

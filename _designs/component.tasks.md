@@ -191,10 +191,10 @@ Files:
 
 Tasks:
 
-- [ ] 9.1 Generate struct literal with only provided fields + generated children field.
-- [ ] 9.2 Always append `..::core::default::Default::default()`.
-- [ ] 9.3 Confirm omitted optional fields (`Option<T>`) resolve to default (`None`).
-- [ ] 9.4 Confirm required field omissions are delegated to Rust compile errors.
+- [x] 9.1 Generate struct literal with only provided fields + generated children field.
+- [x] 9.2 Always append `..::core::default::Default::default()`.
+- [x] 9.3 Confirm omitted optional fields (`Option<T>`) resolve to default (`None`).
+- [ ] 9.4 Confirm required field omissions are delegated to Rust compile errors. (Skipped: conflicts with the Default-based component construction path.)
 
 Exit criteria:
 
@@ -209,11 +209,11 @@ Files:
 
 Tasks:
 
-- [ ] 10.1 Define escaping rules for text node interpolation.
-- [ ] 10.2 Define escaping rules for attribute interpolation.
-- [ ] 10.3 Define raw trusted-html escape hatch type contract.
-- [ ] 10.4 Ensure no double-escaping for trusted-html wrapper values.
-- [ ] 10.5 Add tests for XSS-sensitive interpolation cases.
+- [x] 10.1 Define escaping rules for text node interpolation.
+- [x] 10.2 Define escaping rules for attribute interpolation.
+- [x] 10.3 Define raw trusted-html escape hatch type contract.
+- [x] 10.4 Ensure no double-escaping for trusted-html wrapper values.
+- [x] 10.5 Add tests for XSS-sensitive interpolation cases.
 
 Exit criteria:
 

@@ -1,5 +1,6 @@
 use freshed_rs_macros::{component, html};
 
+#[derive(Default)]
 pub struct CardProps {
     pub children: String,
 }
@@ -8,6 +9,7 @@ pub fn card(props: CardProps) -> String {
     format!("<Card>{}</Card>", props.children)
 }
 
+#[derive(Default)]
 pub struct ItemProps {
     pub label: &'static str,
 }

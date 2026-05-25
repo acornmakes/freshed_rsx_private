@@ -5,6 +5,7 @@ struct Ctx {
     id: usize,
 }
 
+#[derive(Default)]
 pub struct RowProps {
     pub children: String,
 }

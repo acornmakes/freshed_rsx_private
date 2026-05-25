@@ -1,5 +1,5 @@
 error: duplicate property 'label' on component 'Button'
-  --> tests/ui/fail/component_duplicate_props_html_async.rs:13:43
+  --> tests/ui/fail/component_duplicate_props_html_async.rs:14:43
    |
-13 |     let _ = html_async!(<Button label="A" label="B"></Button>);
+14 |     let _ = html_async!(<Button label="A" label="B"></Button>);
    |                                           ^^^^^

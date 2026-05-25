@@ -15,6 +15,7 @@ quote.workspace=true
 syn_derive.workspace=true
 
 [dev-dependencies]
+freshed-rs-runtime.workspace=true
 insta = "1.43.2"
 trybuild = "1.0.114"
 futures = "0.3.31"

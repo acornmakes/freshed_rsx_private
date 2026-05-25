@@ -1,6 +1,7 @@
 use freshed_rs_macros::html;
 
 mod ui {
+    #[derive(Default)]
     pub struct ButtonProps {
         pub kind: &'static str,
         pub children: String,

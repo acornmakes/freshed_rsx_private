@@ -6,7 +6,7 @@ edition = "2024"
 
 [workspace]
 resolver="2"
-members=["freshed-rs-macros", "examples"]
+members=["freshed-rs-macros", "freshed-rs-runtime", "examples"]
 
 [workspace.dependencies]
 rstml = "0.12.1"
@@ -15,4 +15,5 @@ proc-macro2 = { version = "1.0.106", features = ["span-locations"] }
 proc-macro2-diagnostics = "0.10.1"
 quote = "1.0.45"
 freshed-rs-macros = { path ="freshed-rs-macros" }
+freshed-rs-runtime = { path ="freshed-rs-runtime" }
 syn_derive = "0.2.0"

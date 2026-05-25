@@ -1,0 +1,18 @@
+[workspace.package]
+name = "freshed-rs-workspace"
+description="Freshed-RS Things"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+resolver="2"
+members=["freshed-rs-macros", "examples"]
+
+[workspace.dependencies]
+rstml = "0.12.1"
+syn = { version = "2.0.117", features = ["visit-mut", "full", "parsing", "extra-traits"] }
+proc-macro2 = { version = "1.0.106", features = ["span-locations"] }
+proc-macro2-diagnostics = "0.10.1"
+quote = "1.0.45"
+freshed-rs-macros = { path ="freshed-rs-macros" }
+syn_derive = "0.2.0"

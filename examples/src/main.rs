@@ -1,11 +1,30 @@
+use freshed_rs_macros::{component, html, html_to_string, with_children};
+use freshed_rs_runtime::RenderResult;
+
 fn main() {
     println!("Hello, world!");
+    let s = html_to_string!(<div>a</div>).unwrap();
+    println!("{}", s);
+}
+
+#[with_children]
+#[derive(Default)]
+pub struct BadgeProps {
+    pub tone: &'static str,
+    pub count: Option<usize>,
+}
+
+#[component]
+pub fn badge(out: &mut impl ::core::fmt::Write, props: BadgeProps) -> RenderResult {
+    let count = props.count.unwrap_or_default();
+
+    html!(out, <div><div>{props.tone}-{count}</div>{props.children}</div>)
 }
 
 #[cfg(test)]
 mod tests {
-    use freshed_rs_runtime::RenderResult;
     use freshed_rs_macros::html;
+    use freshed_rs_runtime::RenderResult;
 
     #[test]
     fn test_1() {
@@ -26,18 +45,20 @@ mod tests {
     #[derive(Default)]
     pub struct BadgeProps {
         pub tone: &'static str,
+        pub count: Option<usize>,
     }
 
     #[component]
     pub fn badge(out: &mut impl ::core::fmt::Write, props: BadgeProps) -> RenderResult {
-        html!(out, <div><div>{props.tone}</div>{props.children}</div>)
+        let count = props.count.unwrap_or_default();
+        html!(out, <div><div>{props.tone}-{count}</div>{props.children}</div>)
     }
 
     #[test]
     fn test_3() {
         let tone = "success";
         let mut out = String::new();
-        html!(&mut out, <Badge {tone}>{"ok"}</Badge>).expect("render should succeed");
+        html!(&mut out, <Badge tone={tone}>{"ok"}</Badge>).expect("render should succeed");
     }
 
     #[with_children]

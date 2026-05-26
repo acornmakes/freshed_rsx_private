@@ -283,8 +283,54 @@ pub fn html(tokens: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
+pub fn html_to_string(tokens: TokenStream) -> TokenStream {
+    let markup_tokens: proc_macro2::TokenStream = tokens.into();
+    let buffer_ident = format_ident!("__fr_rendered_html");
+
+    let html_tokens: proc_macro2::TokenStream = to_html::compile(
+        quote!( &mut #buffer_ident, #markup_tokens ).into(),
+        MacroMode::Html,
+    )
+    .into();
+
+    quote! {
+        {
+            let mut #buffer_ident = ::std::string::String::new();
+            match #html_tokens {
+                Ok(()) => ::core::result::Result::<::std::string::String, ::freshed_rs_runtime::RenderError>::Ok(#buffer_ident),
+                Err(err) => ::core::result::Result::Err(err)
+            }
+        }
+    }
+    .into()
+}
+
+#[proc_macro]
 pub fn html_async(tokens: TokenStream) -> TokenStream {
     to_html::compile(tokens, MacroMode::HtmlAsync)
+}
+
+#[proc_macro]
+pub fn html_async_to_string(tokens: TokenStream) -> TokenStream {
+    let markup_tokens: proc_macro2::TokenStream = tokens.into();
+    let buffer_ident = format_ident!("__fr_rendered_html");
+
+    let html_tokens: proc_macro2::TokenStream = to_html::compile(
+        quote!( &mut #buffer_ident, #markup_tokens ).into(),
+        MacroMode::Html,
+    )
+    .into();
+
+    quote! {
+        {
+            let mut #buffer_ident = ::std::string::String::new();
+            match #html_tokens {
+                Ok(()) => ::core::result::Result::<::std::string::String, ::freshed_rs_runtime::RenderError>::Ok(#buffer_ident),
+                Err(err) => ::core::result::Result::Err(err)
+            }
+        }
+    }
+    .into()
 }
 
 #[proc_macro]

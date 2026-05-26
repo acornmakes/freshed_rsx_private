@@ -1,0 +1,7 @@
+error: html_ctx! is missing markup after writer and context arguments
+ --> tests/ui_stream/fail/html_ctx_missing_markup.rs:6:13
+  |
+6 |     let _ = html_ctx!(&mut out, ctx,);
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the macro `html_ctx` (in Nightly builds, run with -Z macro-backtrace for more info)

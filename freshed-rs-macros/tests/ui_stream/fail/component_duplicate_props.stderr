@@ -1,0 +1,5 @@
+error: duplicate property 'label' on component 'Button'
+  --> tests/ui_stream/fail/component_duplicate_props.rs:16:47
+   |
+16 |     let _ = html!(&mut out, <Button label="A" label="B" />);
+   |                                               ^^^^^

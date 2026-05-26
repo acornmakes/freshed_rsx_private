@@ -1,0 +1,13 @@
+error: async component marker is only supported in html_async! and html_async_ctx!
+  --> tests/ui_stream/fail/async_marker_in_html.rs:19:39
+   |
+19 |     let _ = html!(&mut out, <UserCard async>{"x"}</UserCard>);
+   |                                       ^^^^^
+
+error[E0277]: the `?` operator can only be applied to values that implement `Try`
+  --> tests/ui_stream/fail/async_marker_in_html.rs:19:30
+   |
+19 |     let _ = html!(&mut out, <UserCard async>{"x"}</UserCard>);
+   |                              ^^^^^^^^ the `?` operator cannot be applied to type `impl Future<Output = Result<(), RenderError>>`
+   |
+   = help: the nightly-only, unstable trait `Try` is not implemented for `impl Future<Output = Result<(), RenderError>>`

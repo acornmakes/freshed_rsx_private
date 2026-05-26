@@ -1,5 +1,5 @@
 use freshed_rs_macros::{component, html, html_async, html_async_ctx, html_ctx, with_children};
-use freshed_rs_runtime::{RawHtml, RenderResult};
+use freshed_rs_runtime::{CollectHtmlFragmentExt, RawHtml, RenderResult};
 use futures::executor::block_on;
 
 #[with_children]
@@ -139,4 +139,25 @@ fn html_async_ctx_supports_context_and_async_components() {
         out,
         "<div><span data-tenant=\"globex\" data-tone=\"info\">x</span><article data-tenant=\"globex\">B</article></div>"
     );
+}
+
+#[test]
+fn html_fragment_expression_returns_raw_fragment() {
+    let mut out = String::new();
+    let item = html!(<li>{7}</li>);
+    html!(&mut out, <ul>{item}</ul>).expect("fragment interpolation should succeed");
+    assert_eq!(out, "<ul><li>7</li></ul>");
+}
+
+#[test]
+fn collect_html_sequence_supports_iterator_composition() {
+    let mut out = String::new();
+    let values = vec![0, 1, 2, 3];
+    let items = values
+        .into_iter()
+        .map(|n| html!(<li>{n}</li>))
+        .collect_html_sequence();
+
+    html!(&mut out, <ul>{items}</ul>).expect("list rendering should succeed");
+    assert_eq!(out, "<ul><li>0</li><li>1</li><li>2</li><li>3</li></ul>");
 }

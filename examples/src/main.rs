@@ -1,13 +1,15 @@
 use freshed_rs_macros::{html, html_to_string, rsx_component, with_children};
-use freshed_rs_runtime::{RenderError, RenderResult};
+use freshed_rs_runtime::{CollectHtmlFragmentExt, RenderResult};
 use std::fmt::Write;
 
 fn main() {
     println!("Hello, world!");
     let s = html_to_string!(<div>a</div>).unwrap();
     println!("{}", s);
-    let b = html_to_string!(<Badge tone={"good"} count={Some(456)} />).unwrap();
+    let b = html_to_string!(<Badge tone={"good"} count={Some(20)} />).unwrap();
     println!("{}", b);
+    let list = html_to_string!(<Looper count={4} />).unwrap();
+    println!("{}", list);
 }
 
 #[with_children]
@@ -20,26 +22,25 @@ pub struct BadgeProps {
 #[rsx_component]
 pub fn Badge(output: &mut impl Write, props: BadgeProps) -> RenderResult {
     let count = props.count.unwrap_or_default();
-
-    html!(output, <div><div>{props.tone}-{count}</div>{props.children}</div>)
+    let header = html!(<h1>{format!("Heading: {}", props.tone)}</h1>);
+    html!(output, <div>{header}<Looper {count} /></div>)
 }
 
 #[derive(Default)]
 pub struct LooperProps {
     pub count: usize,
 }
-// #[rsx_component]
-// pub fn Looper(output: &mut impl Write, props: LooperProps) -> RenderResult {
-//     // let v = vec![0, 1, 2, 3];
-//     // let m = v
-//     //     .into_iter()
-//     //     .map(|n| html!(output, <li>{n}</li>))
-//     //     .collect::<Vec<_>>();
-//     // html!(output, <ul>{m}</ul>)
-// }
+#[rsx_component]
+pub fn Looper(output: &mut impl Write, props: LooperProps) -> RenderResult {
+    let items = (0..props.count)
+        .map(|n| html!(<li id={format!("li-{:02}",n)}>{n}</li>))
+        .collect_html_sequence();
+    html!(output, <ul>{items}</ul>)
+}
 
 #[cfg(test)]
 mod tests {
+    use crate::{Looper, LooperProps};
     use freshed_rs_macros::html;
     use freshed_rs_runtime::RenderResult;
 
@@ -95,5 +96,12 @@ mod tests {
         let mut out = String::new();
         html!(&mut out, <BadgeAdv {tone}>{"ok"}</BadgeAdv>).expect("render should succeed");
         assert_eq!(out, "<div><div>success</div>ok</div>")
+    }
+
+    #[test]
+    fn test_5_collect_html_sequence_loop() {
+        let mut out = String::new();
+        html!(&mut out, <Looper count={3} />).expect("render should succeed");
+        assert_eq!(out, "<ul><li>0</li><li>1</li><li>2</li></ul>");
     }
 }

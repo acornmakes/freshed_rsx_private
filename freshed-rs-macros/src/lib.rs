@@ -6,8 +6,30 @@ mod to_html;
 
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
+use syn::parse::{Parse, ParseStream};
 use syn::{Field, Fields, FnArg, ItemFn, ItemStruct, Pat, ReturnType, Type, TypePath};
 use to_html::MacroMode;
+
+struct HtmlInvocationShape {
+    has_writer_prefix: bool,
+}
+
+impl Parse for HtmlInvocationShape {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        let _: syn::Expr = input.parse()?;
+        if input.is_empty() {
+            return Ok(Self {
+                has_writer_prefix: false,
+            });
+        }
+
+        let _: syn::Token![,] = input.parse()?;
+        let _: proc_macro2::TokenStream = input.parse()?;
+        Ok(Self {
+            has_writer_prefix: true,
+        })
+    }
+}
 
 fn to_pascal_case(source: &str) -> String {
     let mut out = String::new();
@@ -300,7 +322,32 @@ pub fn rsx_component(attr: TokenStream, item: TokenStream) -> TokenStream {
     the html macro to rule them all
 */
 pub fn html(tokens: TokenStream) -> TokenStream {
-    to_html::compile(tokens, MacroMode::Html)
+    let input_tokens: proc_macro2::TokenStream = tokens.into();
+    let parse_result = syn::parse2::<HtmlInvocationShape>(input_tokens.clone());
+
+    if let Ok(shape) = parse_result {
+        if shape.has_writer_prefix {
+            return to_html::compile(input_tokens.into(), MacroMode::Html);
+        }
+    }
+
+    let buffer_ident = format_ident!("__fr_fragment_buf");
+    let html_tokens: proc_macro2::TokenStream =
+        to_html::compile(quote!(&mut #buffer_ident, #input_tokens).into(), MacroMode::Html).into();
+
+    quote! {
+        {
+            let mut #buffer_ident = ::std::string::String::new();
+            let __fr_render_result = #html_tokens;
+            match __fr_render_result {
+                Ok(()) => ::freshed_rs_runtime::HtmlFragment::from_raw(#buffer_ident),
+                Err(__fr_err) => {
+                    panic!("html! fragment rendering failed: {:?}", __fr_err);
+                }
+            }
+        }
+    }
+    .into()
 }
 
 #[proc_macro]

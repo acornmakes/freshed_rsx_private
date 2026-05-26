@@ -80,6 +80,64 @@ Instead of assembling one `format!`, emit direct writes:
 
 This keeps writer plumbing in macro expansion rather than user code.
 
+## Fragment and Sequence Composition (Implemented)
+
+To support ergonomic list/loop composition without forcing callers to manually buffer markup,
+the runtime and macros now include owned fragment primitives.
+
+### Runtime Types
+
+- `HtmlFragment`: an owned rendered fragment of HTML.
+- `HtmlSequence`: an owned ordered list of `HtmlFragment` values.
+- `CollectHtmlExt`: iterator extension trait with `collect_html()`.
+
+`HtmlFragment` and `HtmlSequence` implement `HtmlValue`, so both can be interpolated directly
+inside markup blocks and render as raw HTML fragments.
+
+### `html!` Invocation Shapes
+
+`html!` now supports two forms:
+
+1. Writer form (streaming):
+- `html!(writer, <markup...>) -> RenderResult`
+
+2. Fragment expression form:
+- `html!(<markup...>) -> HtmlFragment`
+
+The expression form is intended for iterator composition and deferred insertion into a
+writer-backed parent template.
+
+### Iterator Composition Pattern
+
+This is the intended API shape for loop-like composition in expression contexts:
+
+```rust
+use freshed_rs_runtime::CollectHtmlExt;
+
+let items = values
+        .into_iter()
+        .map(|n| html!(<li>{n}</li>))
+        .collect_html();
+
+html!(out, <ul>{items}</ul>)?;
+```
+
+`collect_html()` hides concrete collection details and returns `HtmlSequence`.
+
+### Behavioral Notes
+
+- This feature keeps public API lifetime-free for callers.
+- Fragment/sequence interpolation preserves ordering and does not HTML-escape already-rendered
+    fragment markup.
+- Scalar values inside each fragment continue to follow normal escaping rules.
+
+### Review Evidence
+
+- Runtime API evidence: `freshed-rs-runtime/src/lib.rs`
+- Macro entrypoint evidence: `freshed-rs-macros/src/lib.rs`
+- Integration behavior evidence: `freshed-rs-macros/tests/entrypoints.rs`
+- End-user example evidence: `examples/src/main.rs`
+
 ## Children Semantics
 
 Current `#[with_children]` injects `children: String`.

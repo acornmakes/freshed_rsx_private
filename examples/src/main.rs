@@ -1,11 +1,12 @@
 use freshed_rs_macros::{html, html_to_string, rsx_component, with_children};
-use freshed_rs_runtime::RenderResult;
+use freshed_rs_runtime::{RenderError, RenderResult};
+use std::fmt::Write;
 
 fn main() {
     println!("Hello, world!");
     let s = html_to_string!(<div>a</div>).unwrap();
     println!("{}", s);
-    let b = html_to_string!(<Badge tone={"good"} />).unwrap();
+    let b = html_to_string!(<Badge tone={"good"} count={Some(456)} />).unwrap();
     println!("{}", b);
 }
 
@@ -17,11 +18,25 @@ pub struct BadgeProps {
 }
 
 #[rsx_component]
-pub fn Badge(out: &mut impl ::core::fmt::Write, props: BadgeProps) -> RenderResult {
+pub fn Badge(output: &mut impl Write, props: BadgeProps) -> RenderResult {
     let count = props.count.unwrap_or_default();
 
-    html!(out, <div><div>{props.tone}-{count}</div>{props.children}</div>)
+    html!(output, <div><div>{props.tone}-{count}</div>{props.children}</div>)
 }
+
+#[derive(Default)]
+pub struct LooperProps {
+    pub count: usize,
+}
+// #[rsx_component]
+// pub fn Looper(output: &mut impl Write, props: LooperProps) -> RenderResult {
+//     // let v = vec![0, 1, 2, 3];
+//     // let m = v
+//     //     .into_iter()
+//     //     .map(|n| html!(output, <li>{n}</li>))
+//     //     .collect::<Vec<_>>();
+//     // html!(output, <ul>{m}</ul>)
+// }
 
 #[cfg(test)]
 mod tests {

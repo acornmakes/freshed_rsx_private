@@ -2,6 +2,7 @@
   "cSpell.words": ["punct", "rstml"],
   "chat.tools.terminal.autoApprove": {
     "cargo check": true,
-    "cargo test": true
+    "cargo test": true,
+    "cargo build": true
   }
 }

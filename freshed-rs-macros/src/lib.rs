@@ -127,7 +127,7 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
             .to_compile_error()
             .into();
     }
-
+    let original_item_tokens = proc_macro2::TokenStream::from(item.clone());
     let function = match syn::parse::<ItemFn>(item.clone()) {
         Ok(function) => function,
         Err(error) => return error.to_compile_error().into(),
@@ -270,14 +270,35 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     quote! {
-        #function
+        //#function
+        #original_item_tokens
         #props_alias
         #wrapper_fn
     }
     .into()
 }
 
+#[proc_macro_attribute]
+pub fn rsx_component(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let attr_tokens = proc_macro2::TokenStream::from(attr);
+    if !attr_tokens.is_empty() {
+        return syn::Error::new_spanned(attr_tokens, "#[rsx_component] does not accept arguments")
+            .to_compile_error()
+            .into();
+    }
+
+    let item_tokens = proc_macro2::TokenStream::from(item);
+    quote! {
+        #[allow(non_snake_case)]
+        #item_tokens
+    }
+    .into()
+}
+
 #[proc_macro]
+/*
+    the html macro to rule them all
+*/
 pub fn html(tokens: TokenStream) -> TokenStream {
     to_html::compile(tokens, MacroMode::Html)
 }

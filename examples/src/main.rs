@@ -1,10 +1,12 @@
-use freshed_rs_macros::{component, html, html_to_string, with_children};
+use freshed_rs_macros::{html, html_to_string, rsx_component, with_children};
 use freshed_rs_runtime::RenderResult;
 
 fn main() {
     println!("Hello, world!");
     let s = html_to_string!(<div>a</div>).unwrap();
     println!("{}", s);
+    let b = html_to_string!(<Badge tone={"good"} />).unwrap();
+    println!("{}", b);
 }
 
 #[with_children]
@@ -14,16 +16,15 @@ pub struct BadgeProps {
     pub count: Option<usize>,
 }
 
-#[component]
-pub fn badge(out: &mut impl ::core::fmt::Write, props: BadgeProps) -> RenderResult {
+#[rsx_component]
+pub fn Badge(out: &mut impl ::core::fmt::Write, props: BadgeProps) -> RenderResult {
     let count = props.count.unwrap_or_default();
-
     html!(out, <div><div>{props.tone}-{count}</div>{props.children}</div>)
 }
 
 #[cfg(test)]
 mod tests {
-    use freshed_rs_macros::html;
+    use freshed_rs_macros::{html, rsx_component};
     use freshed_rs_runtime::RenderResult;
 
     #[test]

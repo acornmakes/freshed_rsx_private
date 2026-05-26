@@ -109,6 +109,7 @@ struct ComponentTagPaths {
 
 #[derive(Clone)]
 struct ComponentSymbolHint {
+    component_fn_path: syn::Path,
     props_type_path: syn::Path,
 }
 
@@ -234,6 +235,7 @@ where
             self.output
                 .component_symbol_hints
                 .push(ComponentSymbolHint {
+                    component_fn_path: paths.component_fn_path.clone(),
                     props_type_path: paths.props_type_path.clone(),
                 });
 
@@ -822,8 +824,11 @@ pub(crate) fn html_ctxner(
     );
 
     let component_hint_statements = component_symbol_hints.into_iter().map(|hint| {
+        let component_fn_path = hint.component_fn_path;
         let props_type_path = hint.props_type_path;
-        quote_spanned! { props_type_path.span() =>
+        quote_spanned! { component_fn_path.span() =>
+            #[allow(unused)]
+            use #component_fn_path as _;
             #[allow(unused)]
             let _: ::core::option::Option<#props_type_path> = ::core::option::Option::None;
         }

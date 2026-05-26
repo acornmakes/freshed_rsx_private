@@ -19,12 +19,13 @@ pub struct BadgeProps {
 #[rsx_component]
 pub fn Badge(out: &mut impl ::core::fmt::Write, props: BadgeProps) -> RenderResult {
     let count = props.count.unwrap_or_default();
+
     html!(out, <div><div>{props.tone}-{count}</div>{props.children}</div>)
 }
 
 #[cfg(test)]
 mod tests {
-    use freshed_rs_macros::{html, rsx_component};
+    use freshed_rs_macros::html;
     use freshed_rs_runtime::RenderResult;
 
     #[test]

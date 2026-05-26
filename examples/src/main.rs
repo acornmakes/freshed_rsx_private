@@ -102,6 +102,9 @@ mod tests {
     fn test_5_collect_html_sequence_loop() {
         let mut out = String::new();
         html!(&mut out, <Looper count={3} />).expect("render should succeed");
-        assert_eq!(out, "<ul><li>0</li><li>1</li><li>2</li></ul>");
+        assert_eq!(
+            out,
+            "<ul><li id=\"li-00\">0</li><li id=\"li-01\">1</li><li id=\"li-02\">2</li></ul>"
+        );
     }
 }

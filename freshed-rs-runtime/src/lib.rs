@@ -25,16 +25,102 @@ impl RawHtml {
     }
 }
 
-#[derive(Clone, Debug, Default)]
-pub struct HtmlFragment(String);
+#[derive(Clone, Debug)]
+pub enum FragmentChunk {
+    Raw(String),
+}
+
+#[derive(Clone, Debug)]
+enum HtmlFragmentInner {
+    Chunks(Vec<FragmentChunk>),
+    Materialized(String),
+}
+
+#[derive(Clone, Debug)]
+pub struct HtmlFragment {
+    inner: HtmlFragmentInner,
+}
 
 impl HtmlFragment {
     pub fn from_raw<S: Into<String>>(html: S) -> Self {
-        Self(html.into())
+        Self {
+            inner: HtmlFragmentInner::Materialized(html.into()),
+        }
+    }
+
+    pub fn from_chunks(chunks: Vec<FragmentChunk>) -> Self {
+        Self {
+            inner: HtmlFragmentInner::Chunks(chunks),
+        }
+    }
+
+    pub fn render_to<W: Write + ?Sized>(&self, out: &mut W) -> RenderResult {
+        match &self.inner {
+            HtmlFragmentInner::Chunks(chunks) => {
+                for chunk in chunks {
+                    match chunk {
+                        FragmentChunk::Raw(raw) => out.write_str(raw)?,
+                    }
+                }
+            }
+            HtmlFragmentInner::Materialized(html) => {
+                out.write_str(html)?;
+            }
+        }
+
+        Ok(())
     }
 
     pub fn into_inner(self) -> String {
-        self.0
+        match self.inner {
+            HtmlFragmentInner::Chunks(chunks) => {
+                let mut out = String::new();
+                for chunk in chunks {
+                    match chunk {
+                        FragmentChunk::Raw(raw) => out.push_str(&raw),
+                    }
+                }
+                out
+            }
+            HtmlFragmentInner::Materialized(html) => html,
+        }
+    }
+}
+
+impl Default for HtmlFragment {
+    fn default() -> Self {
+        Self::from_raw("")
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct FragmentBuilder {
+    chunks: Vec<FragmentChunk>,
+}
+
+impl FragmentBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn finish(self) -> HtmlFragment {
+        HtmlFragment::from_chunks(self.chunks)
+    }
+}
+
+impl Write for FragmentBuilder {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        if s.is_empty() {
+            return Ok(());
+        }
+
+        if let Some(FragmentChunk::Raw(last)) = self.chunks.last_mut() {
+            last.push_str(s);
+        } else {
+            self.chunks.push(FragmentChunk::Raw(s.to_string()));
+        }
+
+        Ok(())
     }
 }
 
@@ -66,18 +152,25 @@ impl HtmlSequence {
 }
 
 pub trait CollectHtmlFragmentExt: Iterator + Sized {
-    fn collect_html_sequence(self) -> HtmlSequence
+    fn collect_html(self) -> HtmlSequence
     where
         Self::Item: Into<HtmlFragment>,
     {
         HtmlSequence::new(self.map(Into::into).collect())
+    }
+
+    fn collect_html_sequence(self) -> HtmlSequence
+    where
+        Self::Item: Into<HtmlFragment>,
+    {
+        self.collect_html()
     }
 }
 
 impl<I: Iterator> CollectHtmlFragmentExt for I {}
 
 pub trait HtmlValue {
-    fn into_rendered_html(self) -> String;
+    fn write_html<W: Write + ?Sized>(self, out: &mut W) -> RenderResult;
 }
 
 pub fn write_text<W, T>(out: &mut W, value: T) -> RenderResult
@@ -85,8 +178,7 @@ where
     W: Write + ?Sized,
     T: HtmlValue,
 {
-    out.write_str(&value.into_rendered_html())?;
-    Ok(())
+    value.write_html(out)
 }
 
 pub fn write_attr<W, T>(out: &mut W, value: T) -> RenderResult
@@ -94,43 +186,43 @@ where
     W: Write + ?Sized,
     T: HtmlValue,
 {
-    out.write_str(&value.into_rendered_html())?;
-    Ok(())
+    value.write_html(out)
 }
 
 impl HtmlValue for RawHtml {
-    fn into_rendered_html(self) -> String {
-        self.0
+    fn write_html<W: Write + ?Sized>(self, out: &mut W) -> RenderResult {
+        out.write_str(&self.0)?;
+        Ok(())
     }
 }
 
 impl HtmlValue for HtmlFragment {
-    fn into_rendered_html(self) -> String {
-        self.0
+    fn write_html<W: Write + ?Sized>(self, out: &mut W) -> RenderResult {
+        self.render_to(out)
     }
 }
 
 impl HtmlValue for HtmlSequence {
-    fn into_rendered_html(self) -> String {
-        self.fragments
-            .into_iter()
-            .map(|fragment| fragment.into_inner())
-            .collect()
+    fn write_html<W: Write + ?Sized>(self, out: &mut W) -> RenderResult {
+        for fragment in self.fragments {
+            fragment.render_to(out)?;
+        }
+        Ok(())
     }
 }
 
 impl HtmlValue for &HtmlFragment {
-    fn into_rendered_html(self) -> String {
-        self.0.clone()
+    fn write_html<W: Write + ?Sized>(self, out: &mut W) -> RenderResult {
+        self.render_to(out)
     }
 }
 
 impl HtmlValue for &HtmlSequence {
-    fn into_rendered_html(self) -> String {
-        self.fragments
-            .iter()
-            .map(|fragment| fragment.0.as_str())
-            .collect()
+    fn write_html<W: Write + ?Sized>(self, out: &mut W) -> RenderResult {
+        for fragment in &self.fragments {
+            fragment.render_to(out)?;
+        }
+        Ok(())
     }
 }
 
@@ -156,8 +248,10 @@ impl<T> HtmlValue for T
 where
     T: Display,
 {
-    fn into_rendered_html(self) -> String {
-        escape_html(&self.to_string())
+    fn write_html<W: Write + ?Sized>(self, out: &mut W) -> RenderResult {
+        let escaped = escape_html(&self.to_string());
+        out.write_str(&escaped)?;
+        Ok(())
     }
 }
 
@@ -180,9 +274,11 @@ pub fn escape_html(input: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::Write;
+
     use super::{
-        CollectHtmlFragmentExt, HtmlFragment, HtmlSequence, RawHtml, escape_html, write_attr,
-        write_text,
+        CollectHtmlFragmentExt, FragmentBuilder, HtmlFragment, HtmlSequence, RawHtml, escape_html,
+        write_attr, write_text,
     };
 
     #[test]
@@ -243,5 +339,17 @@ mod tests {
         let mut out = String::new();
         write_text(&mut out, seq).expect("write_text should succeed");
         assert_eq!(out, "<li>0</li><li>1</li><li>2</li>");
+    }
+
+    #[test]
+    fn fragment_builder_creates_fragment_without_final_buffer_concat() {
+        let mut builder = FragmentBuilder::new();
+        write!(&mut builder, "<li>{}</li>", 1).expect("write should succeed");
+        write!(&mut builder, "<li>{}</li>", 2).expect("write should succeed");
+
+        let fragment = builder.finish();
+        let mut out = String::new();
+        write_text(&mut out, fragment).expect("write_text should succeed");
+        assert_eq!(out, "<li>1</li><li>2</li>");
     }
 }

@@ -331,16 +331,16 @@ pub fn html(tokens: TokenStream) -> TokenStream {
         }
     }
 
-    let buffer_ident = format_ident!("__fr_fragment_buf");
+    let builder_ident = format_ident!("__fr_fragment_builder");
     let html_tokens: proc_macro2::TokenStream =
-        to_html::compile(quote!(&mut #buffer_ident, #input_tokens).into(), MacroMode::Html).into();
+        to_html::compile(quote!(&mut #builder_ident, #input_tokens).into(), MacroMode::Html).into();
 
     quote! {
         {
-            let mut #buffer_ident = ::std::string::String::new();
+            let mut #builder_ident = ::freshed_rs_runtime::FragmentBuilder::new();
             let __fr_render_result = #html_tokens;
             match __fr_render_result {
-                Ok(()) => ::freshed_rs_runtime::HtmlFragment::from_raw(#buffer_ident),
+                Ok(()) => #builder_ident.finish(),
                 Err(__fr_err) => {
                     panic!("html! fragment rendering failed: {:?}", __fr_err);
                 }

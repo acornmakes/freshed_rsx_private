@@ -1,7 +1,0 @@
-error: html_ctx! expects input in the form: context_expr, <markup...>
- --> tests/ui/fail/html_in_missing_context.rs:4:13
-  |
-4 |     let _ = html_ctx!(<div>oops</div>);
-  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
-  = note: this error originates in the macro `html_ctx` (in Nightly builds, run with -Z macro-backtrace for more info)

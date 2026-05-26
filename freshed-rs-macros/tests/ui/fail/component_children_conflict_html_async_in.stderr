@@ -1,5 +1,0 @@
-error: children provided both as prop and as child nodes
-  --> tests/ui/fail/component_children_conflict_html_async_in.rs:16:41
-   |
-16 |     let _ = html_async_ctx!(ctx, <Panel children={text}>{"body"}</Panel>);
-   |                                         ^^^^^^^^

@@ -4,22 +4,19 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    use freshed_rs_runtime::RenderResult;
     use freshed_rs_macros::html;
 
     #[test]
     fn test_1() {
-        let div = html!(
-            <div>divided</div>
-        )
-        .to_string();
+        let mut div = String::new();
+        html!(&mut div, <div>divided</div>).expect("render should succeed");
         assert_eq!(div, "<div>divided</div>");
     }
     #[test]
     fn test_2() {
-        let div = html!(
-            <div>{123}</div>
-        )
-        .to_string();
+        let mut div = String::new();
+        html!(&mut div, <div>{123}</div>).expect("render should succeed");
         assert_eq!(div, "<div>123</div>");
     }
 
@@ -32,14 +29,15 @@ mod tests {
     }
 
     #[component]
-    pub fn badge(props: BadgeProps) -> String {
-        html!(<div><div>{props.tone}</div>{props.children}</div>)
+    pub fn badge(out: &mut impl ::core::fmt::Write, props: BadgeProps) -> RenderResult {
+        html!(out, <div><div>{props.tone}</div>{props.children}</div>)
     }
 
     #[test]
     fn test_3() {
         let tone = "success";
-        let _out = html!(<Badge {tone}>{"ok"}</Badge>);
+        let mut out = String::new();
+        html!(&mut out, <Badge {tone}>{"ok"}</Badge>).expect("render should succeed");
     }
 
     #[with_children]
@@ -49,14 +47,15 @@ mod tests {
     }
 
     #[component]
-    pub fn badge_adv(props: BadgeAdvProps) -> String {
-        html!(<div><div>{props.tone}</div>{props.children}</div>)
+    pub fn badge_adv(out: &mut impl ::core::fmt::Write, props: BadgeAdvProps) -> RenderResult {
+        html!(out, <div><div>{props.tone}</div>{props.children}</div>)
     }
 
     #[test]
     fn test_4() {
         let tone = "success";
-        let _out = html!(<BadgeAdv {tone}>{"ok"}</BadgeAdv>);
-        assert_eq!(_out, "<div><div>success</div>ok</div>")
+        let mut out = String::new();
+        html!(&mut out, <BadgeAdv {tone}>{"ok"}</BadgeAdv>).expect("render should succeed");
+        assert_eq!(out, "<div><div>success</div>ok</div>")
     }
 }

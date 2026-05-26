@@ -1,4 +1,17 @@
-use std::fmt::Display;
+use std::fmt::{self, Display, Write};
+
+pub type RenderResult = Result<(), RenderError>;
+
+#[derive(Debug)]
+pub enum RenderError {
+    Fmt(fmt::Error),
+}
+
+impl From<fmt::Error> for RenderError {
+    fn from(value: fmt::Error) -> Self {
+        Self::Fmt(value)
+    }
+}
 
 pub struct RawHtml(String);
 
@@ -16,12 +29,22 @@ pub trait HtmlValue {
     fn into_rendered_html(self) -> String;
 }
 
-pub fn render_text<T: HtmlValue>(value: T) -> String {
-    value.into_rendered_html()
+pub fn write_text<W, T>(out: &mut W, value: T) -> RenderResult
+where
+    W: Write + ?Sized,
+    T: HtmlValue,
+{
+    out.write_str(&value.into_rendered_html())?;
+    Ok(())
 }
 
-pub fn render_attr<T: HtmlValue>(value: T) -> String {
-    value.into_rendered_html()
+pub fn write_attr<W, T>(out: &mut W, value: T) -> RenderResult
+where
+    W: Write + ?Sized,
+    T: HtmlValue,
+{
+    out.write_str(&value.into_rendered_html())?;
+    Ok(())
 }
 
 impl HtmlValue for RawHtml {
@@ -58,7 +81,7 @@ pub fn escape_html(input: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{RawHtml, escape_html, render_attr, render_text};
+    use super::{RawHtml, escape_html, write_attr, write_text};
 
     #[test]
     fn escapes_html_metacharacters() {
@@ -67,17 +90,23 @@ mod tests {
 
     #[test]
     fn renders_text_values_as_escaped_html() {
-        assert_eq!(render_text("<span>&\"'"), "&lt;span&gt;&amp;&quot;&#39;");
+        let mut out = String::new();
+        write_text(&mut out, "<span>&\"'").expect("write_text should succeed");
+        assert_eq!(out, "&lt;span&gt;&amp;&quot;&#39;");
     }
 
     #[test]
     fn renders_attribute_values_as_escaped_html() {
-        assert_eq!(render_attr("Tom & Jerry"), "Tom &amp; Jerry");
+        let mut out = String::new();
+        write_attr(&mut out, "Tom & Jerry").expect("write_attr should succeed");
+        assert_eq!(out, "Tom &amp; Jerry");
     }
 
     #[test]
     fn raw_html_skips_additional_escaping() {
         let raw = RawHtml::new("<strong>safe</strong>");
-        assert_eq!(render_text(raw), "<strong>safe</strong>");
+        let mut out = String::new();
+        write_text(&mut out, raw).expect("write_text should succeed");
+        assert_eq!(out, "<strong>safe</strong>");
     }
 }

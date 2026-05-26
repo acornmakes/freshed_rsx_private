@@ -157,28 +157,12 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let inputs: Vec<FnArg> = function.sig.inputs.iter().cloned().collect();
     let (wrapper_params, call_args, props_ty_path) = match inputs.len() {
-        1 => {
-            let props_ident = match unwrap_pat_ident(&inputs[0], "props") {
-                Ok(ident) => ident,
-                Err(err) => return err,
-            };
-            let props_ty = match extract_type_path(&inputs[0], "props") {
-                Ok(ty) => ty,
-                Err(err) => return err,
-            };
-
-            (
-                quote!(#props_ident: #wrapper_props_ident),
-                quote!(#props_ident),
-                props_ty,
-            )
-        }
         2 => {
-            let ctx_ident = match unwrap_pat_ident(&inputs[0], "context") {
+            let out_ident = match unwrap_pat_ident(&inputs[0], "writer") {
                 Ok(ident) => ident,
                 Err(err) => return err,
             };
-            let ctx_ty = match extract_type(&inputs[0], "context") {
+            let out_ty = match extract_type(&inputs[0], "writer") {
                 Ok(ty) => ty,
                 Err(err) => return err,
             };
@@ -193,15 +177,49 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
             };
 
             (
-                quote!(#ctx_ident: #ctx_ty, #props_ident: #wrapper_props_ident),
-                quote!(#ctx_ident, #props_ident),
+                quote!(#out_ident: #out_ty, #props_ident: #wrapper_props_ident),
+                quote!(#out_ident, #props_ident),
+                props_ty,
+            )
+        }
+        3 => {
+            let out_ident = match unwrap_pat_ident(&inputs[0], "writer") {
+                Ok(ident) => ident,
+                Err(err) => return err,
+            };
+            let out_ty = match extract_type(&inputs[0], "writer") {
+                Ok(ty) => ty,
+                Err(err) => return err,
+            };
+
+            let ctx_ident = match unwrap_pat_ident(&inputs[1], "context") {
+                Ok(ident) => ident,
+                Err(err) => return err,
+            };
+            let ctx_ty = match extract_type(&inputs[1], "context") {
+                Ok(ty) => ty,
+                Err(err) => return err,
+            };
+
+            let props_ident = match unwrap_pat_ident(&inputs[2], "props") {
+                Ok(ident) => ident,
+                Err(err) => return err,
+            };
+            let props_ty = match extract_type_path(&inputs[2], "props") {
+                Ok(ty) => ty,
+                Err(err) => return err,
+            };
+
+            (
+                quote!(#out_ident: #out_ty, #ctx_ident: #ctx_ty, #props_ident: #wrapper_props_ident),
+                quote!(#out_ident, #ctx_ident, #props_ident),
                 props_ty,
             )
         }
         _ => {
             return syn::Error::new_spanned(
                 &function.sig.inputs,
-                "#[component] expects function signatures of fn(props) or fn(ctx, props)",
+                "#[component] expects function signatures of fn(writer, props) or fn(writer, ctx, props)",
             )
             .to_compile_error()
             .into();
@@ -276,7 +294,7 @@ pub fn html_ctx(tokens: TokenStream) -> TokenStream {
 
 #[proc_macro]
 pub fn html_async_ctx(tokens: TokenStream) -> TokenStream {
-    to_html::compile(tokens, MacroMode::HtmlAsyncIn)
+    to_html::compile(tokens, MacroMode::HtmlAsyncContext)
 }
 
 #[cfg(test)]

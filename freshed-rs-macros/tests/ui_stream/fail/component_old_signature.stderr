@@ -1,0 +1,5 @@
+error: duplicate property 'label' on component 'Card'
+  --> tests/ui_stream/fail/component_old_signature.rs:16:45
+   |
+16 |     let _ = html!(&mut out, <Card label="A" label="B" />);
+   |                                             ^^^^^

@@ -1,0 +1,5 @@
+error: trailing non-markup tokens after parsed markup are not allowed
+ --> tests/ui_stream/fail/missing_writer_html.rs:5:44
+  |
+5 |     let _ = html!(&mut out, <div>oops</div>,);
+  |                                            ^

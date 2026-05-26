@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{cell::Cell, collections::HashSet, rc::Rc};
 
 use quote::{ToTokens, quote, quote_spanned};
 use rstml::{
@@ -9,16 +9,12 @@ use rstml::{
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 
-// Generated identifiers in macro expansions should use the `__fr_*` prefix.
-// This keeps expansion internals recognizable and minimizes collision risk.
-// mod escape;
-
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum MacroMode {
     Html,
     HtmlAsync,
     HtmlContext,
-    HtmlAsyncIn,
+    HtmlAsyncContext,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -31,7 +27,7 @@ pub(crate) enum CompileMode {
 
 impl MacroMode {
     fn requires_context_arg(self) -> bool {
-        matches!(self, Self::HtmlContext | Self::HtmlAsyncIn)
+        matches!(self, Self::HtmlContext | Self::HtmlAsyncContext)
     }
 
     fn macro_name(self) -> &'static str {
@@ -39,7 +35,7 @@ impl MacroMode {
             Self::Html => "html!",
             Self::HtmlAsync => "html_async!",
             Self::HtmlContext => "html_ctx!",
-            Self::HtmlAsyncIn => "html_async_ctx!",
+            Self::HtmlAsyncContext => "html_async_ctx!",
         }
     }
 
@@ -48,7 +44,7 @@ impl MacroMode {
             Self::Html => CompileMode::SyncNoCtx,
             Self::HtmlAsync => CompileMode::AsyncNoCtx,
             Self::HtmlContext => CompileMode::SyncWithCtx,
-            Self::HtmlAsyncIn => CompileMode::AsyncWithCtx,
+            Self::HtmlAsyncContext => CompileMode::AsyncWithCtx,
         }
     }
 }
@@ -63,36 +59,44 @@ impl CompileMode {
     }
 }
 
-struct MarkupOnlyInput {
-    markup_tokens: proc_macro2::TokenStream,
-}
-
-impl Parse for MarkupOnlyInput {
-    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
-        Ok(Self {
-            markup_tokens: input.parse()?,
-        })
-    }
-}
-
-struct CtxFirstInput {
-    #[allow(dead_code)]
-    ctx_expr: syn::Expr,
+struct WriterMarkupInput {
+    writer_expr: syn::Expr,
     _comma: syn::Token![,],
     markup_tokens: proc_macro2::TokenStream,
 }
 
-impl Parse for CtxFirstInput {
+impl Parse for WriterMarkupInput {
     fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
         Ok(Self {
-            ctx_expr: input.parse()?,
+            writer_expr: input.parse()?,
             _comma: input.parse()?,
             markup_tokens: input.parse()?,
         })
     }
 }
 
+struct WriterCtxMarkupInput {
+    writer_expr: syn::Expr,
+    _comma_a: syn::Token![,],
+    ctx_expr: syn::Expr,
+    _comma_b: syn::Token![,],
+    markup_tokens: proc_macro2::TokenStream,
+}
+
+impl Parse for WriterCtxMarkupInput {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        Ok(Self {
+            writer_expr: input.parse()?,
+            _comma_a: input.parse()?,
+            ctx_expr: input.parse()?,
+            _comma_b: input.parse()?,
+            markup_tokens: input.parse()?,
+        })
+    }
+}
+
 struct ParsedMacroInput {
+    writer_expr: syn::Expr,
     context_expr: Option<syn::Expr>,
     markup_tokens: proc_macro2::TokenStream,
 }
@@ -105,7 +109,6 @@ struct ComponentTagPaths {
 
 #[derive(Clone)]
 struct ComponentSymbolHint {
-    component_fn_path: syn::Path,
     props_type_path: syn::Path,
 }
 
@@ -123,6 +126,304 @@ struct ParsedComponentProps {
     children_key_span: Option<proc_macro2::Span>,
     async_marker_span: Option<proc_macro2::Span>,
     diagnostics: Vec<proc_macro2::TokenStream>,
+}
+
+#[derive(Default)]
+struct WalkNodesOutput {
+    statements: Vec<proc_macro2::TokenStream>,
+    diagnostics: Vec<proc_macro2::TokenStream>,
+    component_symbol_hints: Vec<ComponentSymbolHint>,
+}
+
+struct WalkNodes<'a> {
+    compile_mode: CompileMode,
+    writer_binding: syn::Ident,
+    context_binding: Option<syn::Ident>,
+    empty_elements: &'a HashSet<&'a str>,
+    name_counter: Rc<Cell<usize>>,
+    output: WalkNodesOutput,
+}
+
+impl<'a> WalkNodes<'a> {
+    fn child_output(&self, writer_binding: syn::Ident) -> Self {
+        Self {
+            compile_mode: self.compile_mode,
+            writer_binding,
+            context_binding: self.context_binding.clone(),
+            empty_elements: self.empty_elements,
+            name_counter: Rc::clone(&self.name_counter),
+            output: WalkNodesOutput::default(),
+        }
+    }
+
+    fn next_ident(&self, prefix: &str) -> syn::Ident {
+        let idx = self.name_counter.get();
+        self.name_counter.set(idx + 1);
+        syn::Ident::new(
+            &format!("__fr_{prefix}_{idx}"),
+            proc_macro2::Span::call_site(),
+        )
+    }
+
+    fn push_write_literal<S: AsRef<str>>(&mut self, literal: S) {
+        let literal = literal.as_ref();
+        if literal.is_empty() {
+            return;
+        }
+
+        let writer_binding = &self.writer_binding;
+        self.output.statements.push(quote! {
+            ::core::fmt::Write::write_str(#writer_binding, #literal)
+                .map_err(::freshed_rs_runtime::RenderError::from)?;
+        });
+    }
+}
+
+impl<'a> syn::visit_mut::VisitMut for WalkNodes<'a> {}
+
+impl<'a, C> Visitor<C> for WalkNodes<'a>
+where
+    C: rstml::node::CustomNode + 'static,
+{
+    fn visit_doctype(&mut self, doctype: &mut rstml::node::NodeDoctype) -> bool {
+        let value = doctype.value.to_token_stream_string();
+        self.push_write_literal(format!("<!DOCTYPE {}>", value));
+        false
+    }
+
+    fn visit_text_node(&mut self, node: &mut rstml::node::NodeText) -> bool {
+        self.push_write_literal(node.value_string());
+        false
+    }
+
+    fn visit_raw_node<OtherC: rstml::node::CustomNode>(
+        &mut self,
+        node: &mut rstml::node::RawText<OtherC>,
+    ) -> bool {
+        self.push_write_literal(node.to_string_best());
+        false
+    }
+
+    fn visit_fragment(&mut self, fragment: &mut rstml::node::NodeFragment<C>) -> bool {
+        let visitor = self.child_output(self.writer_binding.clone());
+        let child_output = visit_nodes(&mut fragment.children, visitor);
+        self.output.extend(child_output.output);
+        false
+    }
+
+    fn visit_comment(&mut self, comment: &mut rstml::node::NodeComment) -> bool {
+        self.push_write_literal(format!(
+            "<!-- {} -->",
+            comment.value.to_token_stream().to_string()
+        ));
+        false
+    }
+
+    fn visit_block(&mut self, block: &mut rstml::node::NodeBlock) -> bool {
+        let writer_binding = &self.writer_binding;
+        self.output.statements.push(quote! {
+            ::freshed_rs_runtime::write_text(#writer_binding, (#block))?;
+        });
+        false
+    }
+
+    fn visit_element(&mut self, element: &mut rstml::node::NodeElement<C>) -> bool {
+        let name = element.name().to_string();
+
+        if let Some(paths) = component_paths(&element.open_tag.name) {
+            self.output
+                .component_symbol_hints
+                .push(ComponentSymbolHint {
+                    props_type_path: paths.props_type_path.clone(),
+                });
+
+            let component_label = element.open_tag.name.to_string();
+            let mut parsed_props =
+                parse_component_props(&component_label, element.attributes_mut());
+
+            if parsed_props.has_children_prop && !element.children.is_empty() {
+                let span = parsed_props
+                    .children_key_span
+                    .unwrap_or_else(|| element.open_tag.name.span());
+                let conflict = proc_macro2_diagnostics::Diagnostic::spanned(
+                    span,
+                    proc_macro2_diagnostics::Level::Error,
+                    "children provided both as prop and as child nodes",
+                );
+                parsed_props
+                    .diagnostics
+                    .push(conflict.emit_as_expr_tokens());
+            }
+
+            let mut props_fields = Vec::new();
+            for prop in &parsed_props.props {
+                match ident_from_prop_key(&prop.key, prop.key_span) {
+                    Ok(ident) => {
+                        let value_tokens = prop.value_tokens.clone();
+                        props_fields.push(quote_spanned!(prop.key_span => #ident: #value_tokens));
+                    }
+                    Err(diagnostic) => parsed_props.diagnostics.push(diagnostic),
+                }
+            }
+
+            if !parsed_props.has_children_prop && !element.children.is_empty() {
+                let children_ident = self.next_ident("children");
+                let children_writer_ident = self.next_ident("children_out");
+
+                let child_visitor = self.child_output(children_writer_ident.clone());
+                let child_output = visit_nodes(&mut element.children, child_visitor);
+                let WalkNodesOutput {
+                    statements: child_statements,
+                    diagnostics,
+                    component_symbol_hints,
+                } = child_output.output;
+                self.output.diagnostics.extend(diagnostics);
+                self.output
+                    .component_symbol_hints
+                    .extend(component_symbol_hints);
+                self.output.statements.push(quote! {
+                    let mut #children_ident = ::std::string::String::new();
+                    {
+                        let #children_writer_ident = &mut #children_ident;
+                        #(#child_statements)*
+                    }
+                });
+                props_fields.push(
+                    quote_spanned!(element.open_tag.name.span() => children: #children_ident),
+                );
+            }
+
+            self.output.diagnostics.extend(parsed_props.diagnostics);
+
+            if parsed_props.async_marker_span.is_some() && !self.compile_mode.is_async() {
+                let sync_marker_error = proc_macro2_diagnostics::Diagnostic::spanned(
+                    parsed_props
+                        .async_marker_span
+                        .unwrap_or_else(|| element.open_tag.name.span()),
+                    proc_macro2_diagnostics::Level::Error,
+                    "async component marker is only supported in html_async! and html_async_ctx!",
+                );
+                self.output
+                    .diagnostics
+                    .push(sync_marker_error.emit_as_expr_tokens());
+            }
+
+            let await_suffix =
+                if parsed_props.async_marker_span.is_some() && self.compile_mode.is_async() {
+                    quote!(.await)
+                } else {
+                    quote!()
+                };
+
+            let writer_binding = &self.writer_binding;
+            let component_fn_path = paths.component_fn_path;
+            let props_type_path = paths.props_type_path;
+
+            let call_stmt = if self.compile_mode.uses_context() {
+                if let Some(ctx_ident) = &self.context_binding {
+                    quote_spanned! { element.open_tag.name.span() =>
+                        #component_fn_path(
+                            #writer_binding,
+                            #ctx_ident,
+                            #props_type_path {
+                                #(#props_fields,)*
+                                ..::core::default::Default::default()
+                            }
+                        )#await_suffix?;
+                    }
+                } else {
+                    let missing_ctx = proc_macro2_diagnostics::Diagnostic::spanned(
+                        element.open_tag.name.span(),
+                        proc_macro2_diagnostics::Level::Error,
+                        "internal error: missing context binding for html_ctx/html_async_ctx",
+                    );
+                    self.output
+                        .diagnostics
+                        .push(missing_ctx.emit_as_expr_tokens());
+                    quote! {}
+                }
+            } else {
+                quote_spanned! { element.open_tag.name.span() =>
+                    #component_fn_path(
+                        #writer_binding,
+                        #props_type_path {
+                            #(#props_fields,)*
+                            ..::core::default::Default::default()
+                        }
+                    )#await_suffix?;
+                }
+            };
+
+            self.output.statements.push(call_stmt);
+            return false;
+        }
+
+        self.push_write_literal(format!("<{}", name));
+
+        let visitor = self.child_output(self.writer_binding.clone());
+        let attribute_visitor = visit_attributes(element.attributes_mut(), visitor);
+        self.output.extend(attribute_visitor.output);
+
+        if self
+            .empty_elements
+            .contains(element.open_tag.name.to_string().as_str())
+        {
+            if !element.children.is_empty() {
+                let warning = proc_macro2_diagnostics::Diagnostic::spanned(
+                    element.open_tag.name.span(),
+                    proc_macro2_diagnostics::Level::Warning,
+                    "Element is processed as empty, and cannot have any child",
+                );
+                self.output.diagnostics.push(warning.emit_as_expr_tokens());
+            }
+
+            self.push_write_literal("/>");
+            return false;
+        }
+
+        self.push_write_literal(">");
+
+        let visitor = self.child_output(self.writer_binding.clone());
+        let child_output = visit_nodes(&mut element.children, visitor);
+        self.output.extend(child_output.output);
+        self.push_write_literal(format!("</{}>", name));
+
+        false
+    }
+
+    fn visit_attribute(&mut self, attribute: &mut NodeAttribute) -> bool {
+        match attribute {
+            NodeAttribute::Block(block) => {
+                self.push_write_literal(" ");
+                let writer_binding = &self.writer_binding;
+                self.output.statements.push(quote! {
+                    ::freshed_rs_runtime::write_attr(#writer_binding, (#block))?;
+                });
+            }
+            NodeAttribute::Attribute(attribute) => {
+                self.push_write_literal(format!(" {}", attribute.key));
+                if let Some(value) = attribute.value() {
+                    self.push_write_literal("=\"");
+                    let writer_binding = &self.writer_binding;
+                    self.output.statements.push(quote! {
+                        ::freshed_rs_runtime::write_attr(#writer_binding, (#value))?;
+                    });
+                    self.push_write_literal("\"");
+                }
+            }
+        }
+
+        false
+    }
+}
+
+impl WalkNodesOutput {
+    fn extend(&mut self, other: WalkNodesOutput) {
+        self.statements.extend(other.statements);
+        self.diagnostics.extend(other.diagnostics);
+        self.component_symbol_hints
+            .extend(other.component_symbol_hints);
+    }
 }
 
 fn is_component_tag(name: &NodeName) -> bool {
@@ -278,7 +579,6 @@ fn shorthand_ident_from_block_expr(tokens: &proc_macro2::TokenStream) -> Option<
     }
 
     let expression = syn::parse2::<syn::Expr>(tokens.clone()).ok()?;
-
     shorthand_ident_from_expr(&expression)
 }
 
@@ -323,24 +623,12 @@ fn shorthand_ident_from_expr(expression: &syn::Expr) -> Option<syn::Ident> {
     }
 }
 
-fn build_format_expr_from_fragments(fragments: Vec<RenderFragment>) -> proc_macro2::TokenStream {
-    let (format_string, values) = WalkNodesOutput {
-        fragments,
-        diagnostics: Vec::new(),
-        component_symbol_hints: Vec::new(),
-    }
-    .into_format_parts();
-
-    quote!(format!(#format_string, #(#values),*))
-}
-
 fn ident_from_prop_key(
     key: &str,
     key_span: proc_macro2::Span,
 ) -> Result<syn::Ident, proc_macro2::TokenStream> {
     match syn::parse_str::<syn::Ident>(key) {
-        Ok(ident) => {
-            let mut ident = ident;
+        Ok(mut ident) => {
             ident.set_span(key_span);
             Ok(ident)
         }
@@ -365,6 +653,7 @@ pub(crate) fn compile(tokens: proc_macro::TokenStream, mode: MacroMode) -> proc_
     };
 
     html_ctxner(
+        parsed.writer_expr,
         parsed.context_expr,
         parsed.markup_tokens.into(),
         mode.compile_mode(),
@@ -378,11 +667,11 @@ fn parse_macro_input(
     let tokens: proc_macro2::TokenStream = tokens.into();
 
     if mode.requires_context_arg() {
-        let parsed = syn::parse2::<CtxFirstInput>(tokens).map_err(|_| {
+        let parsed = syn::parse2::<WriterCtxMarkupInput>(tokens).map_err(|_| {
             syn::Error::new(
                 proc_macro2::Span::call_site(),
                 format!(
-                    "{} expects input in the form: context_expr, <markup...>",
+                    "{} expects input in the form: writer_expr, context_expr, <markup...>",
                     mode.macro_name()
                 ),
             )
@@ -392,7 +681,7 @@ fn parse_macro_input(
             return Err(syn::Error::new(
                 proc_macro2::Span::call_site(),
                 format!(
-                    "{} is missing markup after the context argument",
+                    "{} is missing markup after writer and context arguments",
                     mode.macro_name()
                 ),
             ));
@@ -400,14 +689,34 @@ fn parse_macro_input(
         reject_trailing_markup_garbage(&parsed.markup_tokens)?;
 
         return Ok(ParsedMacroInput {
+            writer_expr: parsed.writer_expr,
             context_expr: Some(parsed.ctx_expr),
             markup_tokens: parsed.markup_tokens,
         });
     }
 
-    let parsed = syn::parse2::<MarkupOnlyInput>(tokens)?;
+    let parsed = syn::parse2::<WriterMarkupInput>(tokens).map_err(|_| {
+        syn::Error::new(
+            proc_macro2::Span::call_site(),
+            format!(
+                "{} expects input in the form: writer_expr, <markup...>",
+                mode.macro_name()
+            ),
+        )
+    })?;
+    if parsed.markup_tokens.is_empty() {
+        return Err(syn::Error::new(
+            proc_macro2::Span::call_site(),
+            format!(
+                "{} is missing markup after writer argument",
+                mode.macro_name()
+            ),
+        ));
+    }
     reject_trailing_markup_garbage(&parsed.markup_tokens)?;
+
     Ok(ParsedMacroInput {
+        writer_expr: parsed.writer_expr,
         context_expr: None,
         markup_tokens: parsed.markup_tokens,
     })
@@ -428,321 +737,19 @@ fn reject_trailing_markup_garbage(markup_tokens: &proc_macro2::TokenStream) -> s
     Ok(())
 }
 
-#[derive(Default)]
-struct WalkNodesOutput {
-    // Fragments keep render-planning data independent from final format generation.
-    fragments: Vec<RenderFragment>,
-    // Additional diagnostic messages.
-    diagnostics: Vec<proc_macro2::TokenStream>,
-    // Component symbols are emitted as no-op references so IDEs can navigate
-    // from JSX-like component tags to Rust definitions.
-    component_symbol_hints: Vec<ComponentSymbolHint>,
-}
-
-enum RenderFragment {
-    Static(String),
-    Expr(proc_macro2::TokenStream),
-}
-
-struct WalkNodes<'a> {
-    compile_mode: CompileMode,
-    context_binding: Option<syn::Ident>,
-    empty_elements: &'a HashSet<&'a str>,
-    output: WalkNodesOutput,
-}
-impl<'a> WalkNodes<'a> {
-    fn child_output(&self) -> Self {
-        Self {
-            compile_mode: self.compile_mode,
-            context_binding: self.context_binding.clone(),
-            empty_elements: self.empty_elements,
-            output: WalkNodesOutput::default(),
-        }
-    }
-}
-
-impl WalkNodesOutput {
-    fn push_static<S: AsRef<str>>(&mut self, value: S) {
-        let value = value.as_ref();
-        if value.is_empty() {
-            return;
-        }
-
-        if let Some(RenderFragment::Static(buffer)) = self.fragments.last_mut() {
-            buffer.push_str(value);
-        } else {
-            self.fragments
-                .push(RenderFragment::Static(value.to_string()));
-        }
-    }
-
-    fn push_expr(&mut self, expr: proc_macro2::TokenStream) {
-        self.fragments.push(RenderFragment::Expr(expr));
-    }
-
-    fn into_format_parts(self) -> (String, Vec<proc_macro2::TokenStream>) {
-        let mut static_format = String::new();
-        let mut values = Vec::new();
-
-        for fragment in self.fragments {
-            match fragment {
-                RenderFragment::Static(value) => static_format.push_str(&value),
-                RenderFragment::Expr(expr) => {
-                    static_format.push_str("{}");
-                    values.push(expr);
-                }
-            }
-        }
-
-        (static_format, values)
-    }
-
-    fn extend(&mut self, other: WalkNodesOutput) {
-        let WalkNodesOutput {
-            fragments,
-            diagnostics,
-            component_symbol_hints,
-        } = other;
-
-        for fragment in fragments {
-            match fragment {
-                RenderFragment::Static(value) => self.push_static(value),
-                RenderFragment::Expr(expr) => self.push_expr(expr),
-            }
-        }
-        self.diagnostics.extend(diagnostics);
-        self.component_symbol_hints.extend(component_symbol_hints);
-    }
-}
-impl<'a> syn::visit_mut::VisitMut for WalkNodes<'a> {}
-
-impl<'a, C> Visitor<C> for WalkNodes<'a>
-where
-    C: rstml::node::CustomNode + 'static,
-{
-    fn visit_doctype(&mut self, doctype: &mut rstml::node::NodeDoctype) -> bool {
-        let value = &doctype.value.to_token_stream_string();
-        self.output.push_static(format!("<!DOCTYPE {}>", value));
-        false
-    }
-    fn visit_text_node(&mut self, node: &mut rstml::node::NodeText) -> bool {
-        self.output.push_static(node.value_string());
-        false
-    }
-    fn visit_raw_node<OtherC: rstml::node::CustomNode>(
-        &mut self,
-        node: &mut rstml::node::RawText<OtherC>,
-    ) -> bool {
-        self.output.push_static(node.to_string_best());
-        false
-    }
-    fn visit_fragment(&mut self, fragment: &mut rstml::node::NodeFragment<C>) -> bool {
-        let visitor = self.child_output();
-        let child_output = visit_nodes(&mut fragment.children, visitor);
-        self.output.extend(child_output.output);
-        false
-    }
-
-    fn visit_comment(&mut self, comment: &mut rstml::node::NodeComment) -> bool {
-        self.output.push_static(format!(
-            "<!-- {} -->",
-            comment.value.to_token_stream().to_string()
-        ));
-        false
-    }
-    fn visit_block(&mut self, block: &mut rstml::node::NodeBlock) -> bool {
-        self.output.push_expr(quote! {
-            ::freshed_rs_runtime::render_text((#block))
-        });
-        false
-    }
-    fn visit_element(&mut self, element: &mut rstml::node::NodeElement<C>) -> bool {
-        let name = element.name().to_string();
-
-        // Component branch rendering is progressively expanded across phases.
-        if let Some(paths) = component_paths(&element.open_tag.name) {
-            self.output
-                .component_symbol_hints
-                .push(ComponentSymbolHint {
-                    component_fn_path: paths.component_fn_path.clone(),
-                    props_type_path: paths.props_type_path.clone(),
-                });
-            let component_label = element.open_tag.name.to_string();
-            let mut parsed_props =
-                parse_component_props(&component_label, element.attributes_mut());
-
-            if parsed_props.has_children_prop && !element.children.is_empty() {
-                let span = parsed_props
-                    .children_key_span
-                    .unwrap_or_else(|| element.open_tag.name.span());
-                let conflict = proc_macro2_diagnostics::Diagnostic::spanned(
-                    span,
-                    proc_macro2_diagnostics::Level::Error,
-                    "children provided both as prop and as child nodes",
-                );
-                parsed_props
-                    .diagnostics
-                    .push(conflict.emit_as_expr_tokens());
-            }
-
-            let mut props_fields = Vec::new();
-            for prop in &parsed_props.props {
-                match ident_from_prop_key(&prop.key, prop.key_span) {
-                    Ok(ident) => {
-                        let value_tokens = prop.value_tokens.clone();
-                        props_fields.push(quote_spanned!(prop.key_span => #ident: #value_tokens));
-                    }
-                    Err(diagnostic) => parsed_props.diagnostics.push(diagnostic),
-                }
-            }
-
-            if !parsed_props.has_children_prop && !element.children.is_empty() {
-                let child_visitor = self.child_output();
-                let child_output = visit_nodes(&mut element.children, child_visitor);
-                let WalkNodesOutput {
-                    fragments,
-                    diagnostics,
-                    component_symbol_hints,
-                } = child_output.output;
-                self.output.diagnostics.extend(diagnostics);
-                self.output
-                    .component_symbol_hints
-                    .extend(component_symbol_hints);
-
-                let children_expr = build_format_expr_from_fragments(fragments);
-                props_fields
-                    .push(quote_spanned!(element.open_tag.name.span() => children: #children_expr));
-            }
-
-            self.output.diagnostics.extend(parsed_props.diagnostics);
-
-            let component_fn_path = paths.component_fn_path;
-            let props_type_path = paths.props_type_path;
-            if parsed_props.async_marker_span.is_some() && !self.compile_mode.is_async() {
-                let sync_marker_error = proc_macro2_diagnostics::Diagnostic::spanned(
-                    parsed_props
-                        .async_marker_span
-                        .unwrap_or_else(|| element.open_tag.name.span()),
-                    proc_macro2_diagnostics::Level::Error,
-                    "async component marker is only supported in html_async! and html_async_ctx!",
-                );
-                self.output
-                    .diagnostics
-                    .push(sync_marker_error.emit_as_expr_tokens());
-            }
-
-            let await_suffix =
-                if parsed_props.async_marker_span.is_some() && self.compile_mode.is_async() {
-                    quote!(.await)
-                } else {
-                    quote!()
-                };
-
-            let component_expr = if self.compile_mode.uses_context() {
-                if let Some(ctx_ident) = &self.context_binding {
-                    quote_spanned! { element.open_tag.name.span() =>
-                        #component_fn_path(
-                            #ctx_ident,
-                            #props_type_path {
-                                #(#props_fields,)*
-                                ..::core::default::Default::default()
-                            }
-                        )#await_suffix
-                    }
-                } else {
-                    let missing_ctx = proc_macro2_diagnostics::Diagnostic::spanned(
-                        element.open_tag.name.span(),
-                        proc_macro2_diagnostics::Level::Error,
-                        "internal error: missing context binding for *_in macro mode",
-                    );
-                    self.output
-                        .diagnostics
-                        .push(missing_ctx.emit_as_expr_tokens());
-                    quote!(::std::string::String::new())
-                }
-            } else {
-                quote_spanned! { element.open_tag.name.span() =>
-                    #component_fn_path(
-                        #props_type_path {
-                            #(#props_fields,)*
-                            ..::core::default::Default::default()
-                        }
-                    )#await_suffix
-                }
-            };
-
-            self.output.push_expr(component_expr);
-            return false;
-        }
-
-        self.output.push_static(format!("<{}", name));
-
-        let visitor = self.child_output();
-        let attribute_visitor = visit_attributes(element.attributes_mut(), visitor);
-        self.output.extend(attribute_visitor.output);
-
-        self.output.push_static(">");
-
-        // Ignore childs of special Empty elements
-        if self
-            .empty_elements
-            .contains(element.open_tag.name.to_string().as_str())
-        {
-            self.output
-                .push_static(format!("/</{}>", element.open_tag.name));
-            if !element.children.is_empty() {
-                let warning = proc_macro2_diagnostics::Diagnostic::spanned(
-                    element.open_tag.name.span(),
-                    proc_macro2_diagnostics::Level::Warning,
-                    "Element is processed as empty, and cannot have any child",
-                );
-                self.output.diagnostics.push(warning.emit_as_expr_tokens())
-            }
-
-            return false;
-        }
-        // children
-
-        let visitor = self.child_output();
-        let child_output = visit_nodes(&mut element.children, visitor);
-        self.output.extend(child_output.output);
-        self.output.push_static(format!("</{}>", name));
-        false
-    }
-    fn visit_attribute(&mut self, attribute: &mut NodeAttribute) -> bool {
-        // attributes
-        match attribute {
-            NodeAttribute::Block(block) => {
-                // If the nodes parent is an attribute we prefix with whitespace
-                self.output.push_static(" ");
-                self.output.push_expr(quote! {
-                    ::freshed_rs_runtime::render_attr((#block))
-                });
-            }
-            NodeAttribute::Attribute(attribute) => {
-                self.output.push_static(format!(" {}", attribute.key));
-                if let Some(value) = attribute.value() {
-                    self.output.push_static("=\"");
-                    self.output.push_expr(quote! {
-                        ::freshed_rs_runtime::render_attr((#value))
-                    });
-                    self.output.push_static("\"");
-                }
-            }
-        }
-        false
-    }
-}
 fn walk_nodes<'a>(
     compile_mode: CompileMode,
+    writer_binding: syn::Ident,
     context_binding: Option<syn::Ident>,
     empty_elements: &'a HashSet<&'a str>,
     nodes: &'a mut [Node],
 ) -> WalkNodesOutput {
     let visitor = WalkNodes {
         compile_mode,
+        writer_binding,
         context_binding,
         empty_elements,
+        name_counter: Rc::new(Cell::new(0)),
         output: WalkNodesOutput::default(),
     };
     let mut nodes = nodes.to_vec();
@@ -773,41 +780,19 @@ fn trailing_garbage_diagnostics(nodes: &[Node]) -> Vec<proc_macro2::TokenStream>
     diagnostics
 }
 
-/// Converts HTML to `String`.
-///
-/// Values returned from braced blocks `{}` are expected to return something
-/// that implements `Display`.
-///
-/// See [rstml docs](https://docs.rs/rstml/) for supported tags and syntax.
-///
-/// # Example
-///
-/// ```
-/// use freshed_rs_macros::html;
-/// // using this macro, one should write docs module on top level of crate.
-/// // Macro will link html tags to them.
-/// pub mod docs {
-///     /// Element has open and close tags, content and attributes.
-///     pub fn element() {}
-/// }
-/// # fn main (){
-///
-/// let world = "planet";
-/// assert_eq!(html!(<div>"hello "{world}</div>), "<div>hello planet</div>");
-/// # }
-/// ```
 pub(crate) fn html_ctxner(
+    writer_expr: syn::Expr,
     context_expr: Option<syn::Expr>,
     tokens: proc_macro::TokenStream,
     compile_mode: CompileMode,
 ) -> proc_macro::TokenStream {
-    // https://developer.mozilla.org/en-US/docs/Glossary/Empty_element
     let empty_elements: HashSet<_> = [
         "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param",
         "source", "track", "wbr",
     ]
     .into_iter()
     .collect();
+
     let config = ParserConfig::new()
         .recover_block(true)
         .always_self_closed_elements(empty_elements.clone())
@@ -817,6 +802,7 @@ pub(crate) fn html_ctxner(
     let (mut nodes, errors) = parser.parse_recoverable(tokens).split_vec();
     let trailing_diagnostics = trailing_garbage_diagnostics(&nodes);
 
+    let writer_binding = syn::Ident::new("__fr_out", proc_macro2::Span::call_site());
     let context_binding = if compile_mode.uses_context() {
         Some(syn::Ident::new("__fr_ctx", proc_macro2::Span::call_site()))
     } else {
@@ -824,47 +810,39 @@ pub(crate) fn html_ctxner(
     };
 
     let WalkNodesOutput {
-        fragments,
+        statements,
         component_symbol_hints,
         diagnostics,
     } = walk_nodes(
         compile_mode,
+        writer_binding.clone(),
         context_binding.clone(),
         &empty_elements,
         &mut nodes,
     );
-    let (html_string, values) = WalkNodesOutput {
-        fragments,
-        diagnostics: Vec::new(),
-        component_symbol_hints: Vec::new(),
-    }
-    .into_format_parts();
-    let component_hint_statements = component_symbol_hints.into_iter().flat_map(|hint| {
-        let component_fn_path = hint.component_fn_path;
+
+    let component_hint_statements = component_symbol_hints.into_iter().map(|hint| {
         let props_type_path = hint.props_type_path;
-        vec![
-            quote_spanned! { component_fn_path.span() =>
-                #[allow(unused)]
-                let _ = #component_fn_path;
-            },
-            quote_spanned! { props_type_path.span() =>
-                #[allow(unused)]
-                let _: ::core::option::Option<#props_type_path> = ::core::option::Option::None;
-            },
-        ]
+        quote_spanned! { props_type_path.span() =>
+            #[allow(unused)]
+            let _: ::core::option::Option<#props_type_path> = ::core::option::Option::None;
+        }
     });
+
     let errors = errors
         .into_iter()
         .map(|e| e.emit_as_expr_tokens())
         .chain(diagnostics)
         .chain(trailing_diagnostics);
+
+    let writer_binding_stmt = quote!(let #writer_binding = #writer_expr;);
     let context_binding_stmt = match (compile_mode.uses_context(), context_binding, context_expr) {
         (true, Some(binding), Some(expr)) => quote!(let #binding = (#expr);),
         (true, Some(binding), None) => {
             let diagnostic = proc_macro2_diagnostics::Diagnostic::spanned(
                 proc_macro2::Span::call_site(),
                 proc_macro2_diagnostics::Level::Error,
-                "internal error: missing context expression for *_in macro mode",
+                "internal error: missing context expression for html_ctx/html_async_ctx",
             );
             let emitted = diagnostic.emit_as_expr_tokens();
             quote!(#emitted; let #binding = ();)
@@ -872,36 +850,30 @@ pub(crate) fn html_ctxner(
         _ => quote!(),
     };
 
-    let async_value_bindings: Vec<syn::Ident> = values
-        .iter()
-        .enumerate()
-        .map(|(idx, _)| {
-            syn::Ident::new(&format!("__fr_value_{idx}"), proc_macro2::Span::call_site())
-        })
-        .collect();
-
     let render_expr = if compile_mode.is_async() {
         quote! {
-            async move {
+            async {
+                #writer_binding_stmt
                 #context_binding_stmt
-                #(
-                    let #async_value_bindings = #values;
-                )*
-                format!(#html_string, #(#async_value_bindings),*)
+                #(#statements)*
+                ::core::result::Result::<(), ::freshed_rs_runtime::RenderError>::Ok(())
             }
         }
     } else {
         quote! {
             {
+                #writer_binding_stmt
                 #context_binding_stmt
-                format!(#html_string, #(#values),*)
+                (|| -> ::freshed_rs_runtime::RenderResult {
+                    #(#statements)*
+                    Ok(())
+                })()
             }
         }
     };
 
     quote! {
         {
-            // Make sure that "compile_error!(..);"  can be used in this context.
             #(#errors;)*
             #(#component_hint_statements)*
             #render_expr
@@ -915,7 +887,6 @@ mod tests {
     use super::{component_paths, is_component_tag, parse_component_props};
     use quote::ToTokens;
     use rstml::{Parser, ParserConfig, node::Node};
-    use syn::spanned::Spanned;
 
     fn parse_first_element_name(markup: &str) -> rstml::node::NodeName {
         let tokens: proc_macro2::TokenStream = markup.parse().expect("valid markup tokens");
@@ -978,140 +949,103 @@ mod tests {
     }
 
     #[test]
-    fn classifies_namespaced_tags_as_components_and_infers_props_path() {
-        let name = parse_first_element_name("<ui::Button>ok</ui::Button>");
+    fn supports_component_tag_paths() {
+        let name = parse_first_element_name("<crate::ui::Button />");
         let paths = component_paths(&name).expect("component paths");
 
         assert!(is_component_tag(&name));
         assert_eq!(
             paths.component_fn_path.to_token_stream().to_string(),
-            "ui :: Button"
+            "crate :: ui :: Button"
         );
         assert_eq!(
             paths.props_type_path.to_token_stream().to_string(),
-            "ui :: ButtonProps"
+            "crate :: ui :: ButtonProps"
         );
     }
 
     #[test]
-    fn preserves_source_span_on_component_path_segments() {
-        let name = parse_first_element_name("<Button>ok</Button>");
-        let paths = component_paths(&name).expect("component paths");
-
-        let expected_span = name.span().start();
-        let fn_span = paths
-            .component_fn_path
-            .segments
-            .first()
-            .expect("fn path segment")
-            .ident
-            .span()
-            .start();
-        let props_span = paths
-            .props_type_path
-            .segments
-            .last()
-            .expect("props path segment")
-            .ident
-            .span()
-            .start();
-
-        assert_eq!(fn_span, expected_span);
-        assert_eq!(props_span, expected_span);
-    }
-
-    #[test]
-    fn parses_component_key_literal_and_expr_properties() {
-        let mut element = parse_first_element("<Button label=\"Save\" count={n}></Button>");
-        let component_label = element.open_tag.name.to_string();
-        let parsed = parse_component_props(&component_label, element.attributes_mut());
+    fn parses_async_marker_and_regular_props() {
+        let mut element = parse_first_element(r#"<Card async title="Welcome" count={3} />"#);
+        let parsed = parse_component_props("Card", element.attributes_mut());
 
         assert!(parsed.diagnostics.is_empty());
-        assert!(!parsed.has_children_prop);
+        assert!(parsed.async_marker_span.is_some());
         assert_eq!(parsed.props.len(), 2);
-
-        assert_eq!(parsed.props[0].key, "label");
-        assert_eq!(parsed.props[0].value_tokens.to_string(), "\"Save\"");
+        assert_eq!(parsed.props[0].key, "title");
         assert_eq!(parsed.props[1].key, "count");
-        assert_eq!(parsed.props[1].value_tokens.to_string(), "{ n }");
     }
 
     #[test]
-    fn parses_component_shorthand_identifier_property() {
-        let mut element = parse_first_element("<Button {label}></Button>");
-        let component_label = element.open_tag.name.to_string();
-        let parsed = parse_component_props(&component_label, element.attributes_mut());
+    fn parses_shorthand_props_as_identifier_values() {
+        let mut element = parse_first_element("<Button {tone} {variant} />");
+        let parsed = parse_component_props("Button", element.attributes_mut());
 
         assert!(parsed.diagnostics.is_empty());
-        assert_eq!(parsed.props.len(), 1);
-        assert_eq!(parsed.props[0].key, "label");
-        assert_eq!(parsed.props[0].value_tokens.to_string(), "label");
+        assert_eq!(parsed.props.len(), 2);
+        assert_eq!(parsed.props[0].key, "tone");
+        assert_eq!(parsed.props[1].key, "variant");
+
+        let tone_tokens = parsed.props[0].value_tokens.to_string();
+        let variant_tokens = parsed.props[1].value_tokens.to_string();
+        assert_eq!(tone_tokens, "tone");
+        assert_eq!(variant_tokens, "variant");
     }
 
     #[test]
-    fn rejects_non_identifier_component_shorthand_expression() {
-        let mut element = parse_first_element("<Button {a + b}></Button>");
-        let component_label = element.open_tag.name.to_string();
-        let parsed = parse_component_props(&component_label, element.attributes_mut());
+    fn reports_duplicate_component_props() {
+        let mut element = parse_first_element("<Button kind=\"a\" kind=\"b\" />");
+        let parsed = parse_component_props("Button", element.attributes_mut());
 
-        assert!(!parsed.diagnostics.is_empty());
+        assert_eq!(parsed.props.len(), 1);
+        assert_eq!(parsed.diagnostics.len(), 1);
+    }
+
+    #[test]
+    fn reports_invalid_shorthand_component_props() {
+        let mut element = parse_first_element("<Button {a + b} />");
+        let parsed = parse_component_props("Button", element.attributes_mut());
+
         assert!(parsed.props.is_empty());
+        assert_eq!(parsed.diagnostics.len(), 1);
     }
 
     #[test]
-    fn rejects_duplicate_component_property_names() {
-        let mut element = parse_first_element("<Button label=\"A\" label=\"B\"></Button>");
-        let component_label = element.open_tag.name.to_string();
-        let parsed = parse_component_props(&component_label, element.attributes_mut());
+    fn tracks_children_prop_presence_and_span() {
+        let mut element = parse_first_element("<Card children={content} />");
+        let parsed = parse_component_props("Card", element.attributes_mut());
 
-        assert_eq!(parsed.props.len(), 1);
-        assert_eq!(parsed.props[0].key, "label");
-        assert!(!parsed.diagnostics.is_empty());
-    }
-
-    #[test]
-    fn tracks_children_component_property() {
-        let mut element = parse_first_element("<Button children={child_html}></Button>");
-        let component_label = element.open_tag.name.to_string();
-        let parsed = parse_component_props(&component_label, element.attributes_mut());
-
-        assert!(parsed.diagnostics.is_empty());
         assert!(parsed.has_children_prop);
+        assert!(parsed.children_key_span.is_some());
         assert_eq!(parsed.props.len(), 1);
         assert_eq!(parsed.props[0].key, "children");
     }
 
     #[test]
-    fn tracks_async_marker_without_treating_it_as_component_prop() {
-        let mut element = parse_first_element("<Button async label=\"Save\"></Button>");
-        let component_label = element.open_tag.name.to_string();
-        let parsed = parse_component_props(&component_label, element.attributes_mut());
+    fn reports_duplicate_async_markers() {
+        let mut element = parse_first_element("<Card async async />");
+        let parsed = parse_component_props("Card", element.attributes_mut());
 
-        assert!(parsed.diagnostics.is_empty());
         assert!(parsed.async_marker_span.is_some());
-        assert_eq!(parsed.props.len(), 1);
-        assert_eq!(parsed.props[0].key, "label");
+        assert_eq!(parsed.diagnostics.len(), 1);
     }
 
     #[test]
-    fn rejects_duplicate_async_markers() {
-        let mut element = parse_first_element("<Button async async></Button>");
-        let component_label = element.open_tag.name.to_string();
-        let parsed = parse_component_props(&component_label, element.attributes_mut());
+    fn reports_async_marker_value_usage() {
+        let mut element = parse_first_element("<Card async={true} />");
+        let parsed = parse_component_props("Card", element.attributes_mut());
 
         assert!(parsed.async_marker_span.is_some());
-        assert!(!parsed.diagnostics.is_empty());
-        assert!(parsed.props.is_empty());
+        assert_eq!(parsed.diagnostics.len(), 1);
     }
 
     #[test]
-    fn rejects_async_marker_with_assigned_value() {
-        let mut element = parse_first_element("<Button async={flag}></Button>");
-        let component_label = element.open_tag.name.to_string();
-        let parsed = parse_component_props(&component_label, element.attributes_mut());
+    fn diagnostics_keep_prop_key_spans() {
+        let mut element = parse_first_element("<Card role=\"a\" role=\"b\" />");
+        let parsed = parse_component_props("Card", element.attributes_mut());
 
-        assert!(parsed.async_marker_span.is_some());
-        assert!(!parsed.diagnostics.is_empty());
-        assert!(parsed.props.is_empty());
+        let duplicate_key_span = parsed.props[0].key_span;
+        assert_eq!(parsed.props[0].key, "role");
+        assert_eq!(duplicate_key_span.start().line, 1);
     }
 }

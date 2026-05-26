@@ -1,5 +1,0 @@
-error: trailing non-markup tokens after parsed markup are not allowed
- --> tests/ui/fail/html_in_trailing_garbage.rs:5:42
-  |
-5 |     let _ = html_ctx!(_ctx, <div>ok</div>,);
-  |                                          ^

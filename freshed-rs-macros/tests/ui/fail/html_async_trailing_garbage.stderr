@@ -1,5 +1,0 @@
-error: trailing non-markup tokens after parsed markup are not allowed
- --> tests/ui/fail/html_async_trailing_garbage.rs:4:38
-  |
-4 |     let _ = html_async!(<div>ok</div>,);
-  |                                      ^

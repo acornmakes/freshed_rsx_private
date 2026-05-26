@@ -1,0 +1,17 @@
+error[E0308]: mismatched types
+ --> tests/ui_stream/fail/ctx_argument_order.rs:6:13
+  |
+6 |     let _ = html_ctx!(ctx, &mut out, <div>oops</div>);
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |             |
+  |             expected `&mut _`, found integer
+  |             arguments to this function are incorrect
+  |
+  = note: expected mutable reference `&mut _`
+                          found type `{integer}`
+note: method defined here
+ --> $RUST/core/src/fmt/mod.rs
+  |
+  |     fn write_str(&mut self, s: &str) -> Result;
+  |        ^^^^^^^^^
+  = note: this error originates in the macro `html_ctx` (in Nightly builds, run with -Z macro-backtrace for more info)

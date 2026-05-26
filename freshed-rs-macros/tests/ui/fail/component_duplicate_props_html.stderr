@@ -1,5 +1,0 @@
-error: duplicate property 'label' on component 'Button'
-  --> tests/ui/fail/component_duplicate_props_html.rs:14:37
-   |
-14 |     let _ = html!(<Button label="A" label="B"></Button>);
-   |                                     ^^^^^

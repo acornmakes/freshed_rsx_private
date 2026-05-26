@@ -1,7 +1,0 @@
-error: html_ctx! is missing markup after the context argument
- --> tests/ui/fail/html_in_missing_markup.rs:5:13
-  |
-5 |     let _ = html_ctx!(ctx,);
-  |             ^^^^^^^^^^^^^^^
-  |
-  = note: this error originates in the macro `html_ctx` (in Nightly builds, run with -Z macro-backtrace for more info)

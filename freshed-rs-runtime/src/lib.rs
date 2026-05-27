@@ -1,5 +1,7 @@
 use std::fmt::{self, Display, Write};
 
+const INLINE_TEXT_CAPACITY: usize = 48;
+
 pub type RenderResult = Result<(), RenderError>;
 
 #[derive(Debug)]
@@ -27,7 +29,72 @@ impl RawHtml {
 
 #[derive(Clone, Debug)]
 pub enum FragmentChunk {
+    Literal(String),
+    Escaped(TextStorage),
     Raw(String),
+}
+
+#[derive(Clone, Debug)]
+pub enum TextStorage {
+    Inline {
+        len: usize,
+        bytes: [u8; INLINE_TEXT_CAPACITY],
+    },
+    Heap(String),
+}
+
+impl TextStorage {
+    pub fn from_string(text: String) -> Self {
+        if text.len() <= INLINE_TEXT_CAPACITY {
+            let mut bytes = [0u8; INLINE_TEXT_CAPACITY];
+            bytes[..text.len()].copy_from_slice(text.as_bytes());
+            Self::Inline {
+                len: text.len(),
+                bytes,
+            }
+        } else {
+            Self::Heap(text)
+        }
+    }
+
+    pub fn from_str(text: &str) -> Self {
+        Self::from_string(text.to_string())
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Inline { len, bytes } => std::str::from_utf8(&bytes[..*len])
+                .expect("inline text should always be valid UTF-8"),
+            Self::Heap(text) => text,
+        }
+    }
+
+    pub fn into_string(self) -> String {
+        match self {
+            Self::Inline { len, bytes } => std::str::from_utf8(&bytes[..len])
+                .expect("inline text should always be valid UTF-8")
+                .to_string(),
+            Self::Heap(text) => text,
+        }
+    }
+
+    pub fn push_str(&mut self, suffix: &str) {
+        if suffix.is_empty() {
+            return;
+        }
+
+        match self {
+            Self::Inline { len, bytes } if *len + suffix.len() <= INLINE_TEXT_CAPACITY => {
+                bytes[*len..*len + suffix.len()].copy_from_slice(suffix.as_bytes());
+                *len += suffix.len();
+            }
+            _ => {
+                let mut heap = self.clone().into_string();
+                heap.push_str(suffix);
+                *self = Self::Heap(heap);
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -54,11 +121,20 @@ impl HtmlFragment {
         }
     }
 
+    fn into_chunks_for_merge(self) -> Vec<FragmentChunk> {
+        match self.inner {
+            HtmlFragmentInner::Chunks(chunks) => chunks,
+            HtmlFragmentInner::Materialized(html) => vec![FragmentChunk::Literal(html)],
+        }
+    }
+
     pub fn render_to<W: Write + ?Sized>(&self, out: &mut W) -> RenderResult {
         match &self.inner {
             HtmlFragmentInner::Chunks(chunks) => {
                 for chunk in chunks {
                     match chunk {
+                        FragmentChunk::Literal(literal) => out.write_str(literal)?,
+                        FragmentChunk::Escaped(text) => write_escaped_into(out, text.as_str())?,
                         FragmentChunk::Raw(raw) => out.write_str(raw)?,
                     }
                 }
@@ -73,16 +149,15 @@ impl HtmlFragment {
 
     pub fn into_inner(self) -> String {
         match self.inner {
-            HtmlFragmentInner::Chunks(chunks) => {
+            HtmlFragmentInner::Materialized(html) => html,
+            inner => {
+                let fragment = HtmlFragment { inner };
                 let mut out = String::new();
-                for chunk in chunks {
-                    match chunk {
-                        FragmentChunk::Raw(raw) => out.push_str(&raw),
-                    }
-                }
+                fragment
+                    .render_to(&mut out)
+                    .expect("rendering into string should succeed");
                 out
             }
-            HtmlFragmentInner::Materialized(html) => html,
         }
     }
 }
@@ -103,8 +178,20 @@ impl FragmentBuilder {
         Self::default()
     }
 
+    pub fn push_chunk(&mut self, chunk: FragmentChunk) {
+        push_chunk_normalized(&mut self.chunks, chunk);
+    }
+
+    pub fn push_fragment(&mut self, fragment: HtmlFragment) {
+        for chunk in fragment.into_chunks_for_merge() {
+            self.push_chunk(chunk);
+        }
+    }
+
     pub fn finish(self) -> HtmlFragment {
-        HtmlFragment::from_chunks(self.chunks)
+        let mut chunks = self.chunks;
+        normalize_chunks(&mut chunks);
+        HtmlFragment::from_chunks(chunks)
     }
 }
 
@@ -114,14 +201,40 @@ impl Write for FragmentBuilder {
             return Ok(());
         }
 
-        if let Some(FragmentChunk::Raw(last)) = self.chunks.last_mut() {
-            last.push_str(s);
-        } else {
-            self.chunks.push(FragmentChunk::Raw(s.to_string()));
-        }
+        self.push_chunk(FragmentChunk::Literal(s.to_string()));
 
         Ok(())
     }
+}
+
+fn push_chunk_normalized(chunks: &mut Vec<FragmentChunk>, chunk: FragmentChunk) {
+    if let Some(last) = chunks.last_mut() {
+        match (last, &chunk) {
+            (FragmentChunk::Literal(left), FragmentChunk::Literal(right)) => {
+                left.push_str(right);
+                return;
+            }
+            (FragmentChunk::Raw(left), FragmentChunk::Raw(right)) => {
+                left.push_str(right);
+                return;
+            }
+            (FragmentChunk::Escaped(left), FragmentChunk::Escaped(right)) => {
+                left.push_str(right.as_str());
+                return;
+            }
+            _ => {}
+        }
+    }
+
+    chunks.push(chunk);
+}
+
+fn normalize_chunks(chunks: &mut Vec<FragmentChunk>) {
+    let mut normalized = Vec::with_capacity(chunks.len());
+    for chunk in chunks.drain(..) {
+        push_chunk_normalized(&mut normalized, chunk);
+    }
+    *chunks = normalized;
 }
 
 #[derive(Clone, Debug, Default)]
@@ -228,19 +341,21 @@ impl HtmlValue for &HtmlSequence {
 
 impl From<RawHtml> for HtmlFragment {
     fn from(value: RawHtml) -> Self {
-        HtmlFragment::from_raw(value.into_inner())
+        HtmlFragment::from_chunks(vec![FragmentChunk::Raw(value.into_inner())])
     }
 }
 
 impl From<String> for HtmlFragment {
     fn from(value: String) -> Self {
-        HtmlFragment::from_raw(escape_html(&value))
+        HtmlFragment::from_chunks(vec![FragmentChunk::Escaped(TextStorage::from_string(
+            value,
+        ))])
     }
 }
 
 impl From<&str> for HtmlFragment {
     fn from(value: &str) -> Self {
-        HtmlFragment::from_raw(escape_html(value))
+        HtmlFragment::from_chunks(vec![FragmentChunk::Escaped(TextStorage::from_str(value))])
     }
 }
 
@@ -249,10 +364,25 @@ where
     T: Display,
 {
     fn write_html<W: Write + ?Sized>(self, out: &mut W) -> RenderResult {
-        let escaped = escape_html(&self.to_string());
-        out.write_str(&escaped)?;
+        let display = self.to_string();
+        write_escaped_into(out, &display)?;
         Ok(())
     }
+}
+
+fn write_escaped_into<W: Write + ?Sized>(out: &mut W, input: &str) -> RenderResult {
+    for ch in input.chars() {
+        match ch {
+            '&' => out.write_str("&amp;")?,
+            '<' => out.write_str("&lt;")?,
+            '>' => out.write_str("&gt;")?,
+            '"' => out.write_str("&quot;")?,
+            '\'' => out.write_str("&#39;")?,
+            _ => out.write_char(ch)?,
+        }
+    }
+
+    Ok(())
 }
 
 pub fn escape_html(input: &str) -> String {
@@ -277,8 +407,8 @@ mod tests {
     use std::fmt::Write;
 
     use super::{
-        CollectHtmlFragmentExt, FragmentBuilder, HtmlFragment, HtmlSequence, RawHtml, escape_html,
-        write_attr, write_text,
+        CollectHtmlFragmentExt, FragmentBuilder, FragmentChunk, HtmlFragment, HtmlSequence,
+        INLINE_TEXT_CAPACITY, RawHtml, TextStorage, escape_html, write_attr, write_text,
     };
 
     #[test]
@@ -351,5 +481,43 @@ mod tests {
         let mut out = String::new();
         write_text(&mut out, fragment).expect("write_text should succeed");
         assert_eq!(out, "<li>1</li><li>2</li>");
+    }
+
+    #[test]
+    fn escaped_chunk_is_escaped_at_render_time() {
+        let fragment = HtmlFragment::from_chunks(vec![
+            FragmentChunk::Literal("<p>".to_string()),
+            FragmentChunk::Escaped(TextStorage::from_str("<x>&\"'")),
+            FragmentChunk::Literal("</p>".to_string()),
+        ]);
+
+        let mut out = String::new();
+        write_text(&mut out, fragment).expect("write_text should succeed");
+        assert_eq!(out, "<p>&lt;x&gt;&amp;&quot;&#39;</p>");
+    }
+
+    #[test]
+    fn text_storage_inlines_short_values() {
+        let short = TextStorage::from_str("short");
+        let long = TextStorage::from_string("x".repeat(INLINE_TEXT_CAPACITY + 1));
+
+        assert!(matches!(short, TextStorage::Inline { .. }));
+        assert!(matches!(long, TextStorage::Heap(_)));
+    }
+
+    #[test]
+    fn fragment_builder_normalizes_adjacent_chunks_from_fragments() {
+        let mut builder = FragmentBuilder::new();
+        builder.push_fragment(HtmlFragment::from_chunks(vec![FragmentChunk::Escaped(
+            TextStorage::from_str("a"),
+        )]));
+        builder.push_fragment(HtmlFragment::from_chunks(vec![FragmentChunk::Escaped(
+            TextStorage::from_str("b"),
+        )]));
+
+        let fragment = builder.finish();
+        let mut out = String::new();
+        write_text(&mut out, fragment).expect("write_text should succeed");
+        assert_eq!(out, "ab");
     }
 }

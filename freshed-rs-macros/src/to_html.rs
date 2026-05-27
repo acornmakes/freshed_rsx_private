@@ -142,6 +142,7 @@ struct WalkNodes<'a> {
     context_binding: Option<syn::Ident>,
     empty_elements: &'a HashSet<&'a str>,
     name_counter: Rc<Cell<usize>>,
+    literal_buffer: String,
     output: WalkNodesOutput,
 }
 
@@ -153,6 +154,7 @@ impl<'a> WalkNodes<'a> {
             context_binding: self.context_binding.clone(),
             empty_elements: self.empty_elements,
             name_counter: Rc::clone(&self.name_counter),
+            literal_buffer: String::new(),
             output: WalkNodesOutput::default(),
         }
     }
@@ -172,11 +174,36 @@ impl<'a> WalkNodes<'a> {
             return;
         }
 
+        self.literal_buffer.push_str(literal);
+    }
+
+    fn flush_literal_buffer(&mut self) {
+        if self.literal_buffer.is_empty() {
+            return;
+        }
+
         let writer_binding = &self.writer_binding;
+        let literal = std::mem::take(&mut self.literal_buffer);
         self.output.statements.push(quote! {
             ::core::fmt::Write::write_str(#writer_binding, #literal)
                 .map_err(::freshed_rs_runtime::RenderError::from)?;
         });
+    }
+
+    fn push_statement(&mut self, statement: proc_macro2::TokenStream) {
+        self.flush_literal_buffer();
+        self.output.statements.push(statement);
+    }
+
+    fn extend_output(&mut self, other: WalkNodesOutput) {
+        self.flush_literal_buffer();
+        self.output.extend(other);
+    }
+
+    fn into_output(mut self) -> WalkNodesOutput {
+        self.flush_literal_buffer();
+        self.output.coalesce_literal_write_statements();
+        self.output
     }
 }
 
@@ -208,7 +235,7 @@ where
     fn visit_fragment(&mut self, fragment: &mut rstml::node::NodeFragment<C>) -> bool {
         let visitor = self.child_output(self.writer_binding.clone());
         let child_output = visit_nodes(&mut fragment.children, visitor);
-        self.output.extend(child_output.output);
+        self.extend_output(child_output.into_output());
         false
     }
 
@@ -222,7 +249,7 @@ where
 
     fn visit_block(&mut self, block: &mut rstml::node::NodeBlock) -> bool {
         let writer_binding = &self.writer_binding;
-        self.output.statements.push(quote! {
+        self.push_statement(quote! {
             ::freshed_rs_runtime::write_text(#writer_binding, (#block))?;
         });
         false
@@ -278,12 +305,12 @@ where
                     statements: child_statements,
                     diagnostics,
                     component_symbol_hints,
-                } = child_output.output;
+                } = child_output.into_output();
                 self.output.diagnostics.extend(diagnostics);
                 self.output
                     .component_symbol_hints
                     .extend(component_symbol_hints);
-                self.output.statements.push(quote! {
+                self.push_statement(quote! {
                     let mut #children_ident = ::std::string::String::new();
                     {
                         let #children_writer_ident = &mut #children_ident;
@@ -356,7 +383,7 @@ where
                 }
             };
 
-            self.output.statements.push(call_stmt);
+            self.push_statement(call_stmt);
             return false;
         }
 
@@ -364,7 +391,7 @@ where
 
         let visitor = self.child_output(self.writer_binding.clone());
         let attribute_visitor = visit_attributes(element.attributes_mut(), visitor);
-        self.output.extend(attribute_visitor.output);
+        self.extend_output(attribute_visitor.into_output());
 
         if self
             .empty_elements
@@ -387,7 +414,7 @@ where
 
         let visitor = self.child_output(self.writer_binding.clone());
         let child_output = visit_nodes(&mut element.children, visitor);
-        self.output.extend(child_output.output);
+        self.extend_output(child_output.into_output());
         self.push_write_literal(format!("</{}>", name));
 
         false
@@ -398,7 +425,7 @@ where
             NodeAttribute::Block(block) => {
                 self.push_write_literal(" ");
                 let writer_binding = &self.writer_binding;
-                self.output.statements.push(quote! {
+                self.push_statement(quote! {
                     ::freshed_rs_runtime::write_attr(#writer_binding, (#block))?;
                 });
             }
@@ -406,10 +433,14 @@ where
                 self.push_write_literal(format!(" {}", attribute.key));
                 if let Some(value) = attribute.value() {
                     self.push_write_literal("=\"");
-                    let writer_binding = &self.writer_binding;
-                    self.output.statements.push(quote! {
-                        ::freshed_rs_runtime::write_attr(#writer_binding, (#value))?;
-                    });
+                    if let Some(static_attr_value) = compile_time_attr_string_literal(value) {
+                        self.push_write_literal(static_attr_value);
+                    } else {
+                        let writer_binding = &self.writer_binding;
+                        self.push_statement(quote! {
+                            ::freshed_rs_runtime::write_attr(#writer_binding, (#value))?;
+                        });
+                    }
                     self.push_write_literal("\"");
                 }
             }
@@ -426,6 +457,146 @@ impl WalkNodesOutput {
         self.component_symbol_hints
             .extend(other.component_symbol_hints);
     }
+
+    fn coalesce_literal_write_statements(&mut self) {
+        let mut merged = Vec::with_capacity(self.statements.len());
+        let mut pending: Option<(proc_macro2::TokenStream, String)> = None;
+
+        for statement in self.statements.drain(..) {
+            if let Some((writer, literal)) = parse_literal_write_statement(&statement) {
+                match &mut pending {
+                    Some((pending_writer, pending_literal))
+                        if pending_writer.to_string() == writer.to_string() =>
+                    {
+                        pending_literal.push_str(&literal);
+                    }
+                    Some((pending_writer, pending_literal)) => {
+                        merged.push(build_literal_write_statement(
+                            pending_writer.clone(),
+                            pending_literal,
+                        ));
+                        pending = Some((writer, literal));
+                    }
+                    None => pending = Some((writer, literal)),
+                }
+            } else {
+                if let Some((pending_writer, pending_literal)) = pending.take() {
+                    merged.push(build_literal_write_statement(
+                        pending_writer,
+                        &pending_literal,
+                    ));
+                }
+                merged.push(statement);
+            }
+        }
+
+        if let Some((pending_writer, pending_literal)) = pending.take() {
+            merged.push(build_literal_write_statement(
+                pending_writer,
+                &pending_literal,
+            ));
+        }
+
+        self.statements = merged;
+    }
+}
+
+fn build_literal_write_statement(
+    writer: proc_macro2::TokenStream,
+    literal: &str,
+) -> proc_macro2::TokenStream {
+    quote! {
+        ::core::fmt::Write::write_str(#writer, #literal)
+            .map_err(::freshed_rs_runtime::RenderError::from)?;
+    }
+}
+
+fn parse_literal_write_statement(
+    statement: &proc_macro2::TokenStream,
+) -> Option<(proc_macro2::TokenStream, String)> {
+    let parsed = syn::parse2::<syn::Stmt>(statement.clone()).ok()?;
+    let expr = match parsed {
+        syn::Stmt::Expr(expr, _) => expr,
+        _ => return None,
+    };
+
+    let try_expr = match expr {
+        syn::Expr::Try(try_expr) => try_expr,
+        _ => return None,
+    };
+
+    let map_err_call = match *try_expr.expr {
+        syn::Expr::MethodCall(call) if call.method == "map_err" => call,
+        _ => return None,
+    };
+
+    let write_call = match *map_err_call.receiver {
+        syn::Expr::Call(call) => call,
+        _ => return None,
+    };
+
+    let write_fn = match *write_call.func {
+        syn::Expr::Path(path) => path,
+        _ => return None,
+    };
+
+    if write_fn.path.segments.last()?.ident != "write_str" {
+        return None;
+    }
+
+    if write_call.args.len() != 2 {
+        return None;
+    }
+
+    let writer_expr = write_call.args.first()?.to_token_stream();
+    let literal_expr = write_call.args.iter().nth(1)?;
+    let literal = match literal_expr {
+        syn::Expr::Lit(syn::ExprLit {
+            lit: syn::Lit::Str(lit),
+            ..
+        }) => lit.value(),
+        _ => return None,
+    };
+
+    Some((writer_expr, literal))
+}
+
+fn compile_time_attr_string_literal(value: &impl ToTokens) -> Option<String> {
+    let expression = syn::parse2::<syn::Expr>(value.to_token_stream()).ok()?;
+    let literal = match strip_grouping_expr(&expression) {
+        syn::Expr::Lit(syn::ExprLit {
+            lit: syn::Lit::Str(lit),
+            ..
+        }) => lit.value(),
+        _ => return None,
+    };
+
+    Some(escape_html_literal(&literal))
+}
+
+fn strip_grouping_expr(mut expression: &syn::Expr) -> &syn::Expr {
+    loop {
+        expression = match expression {
+            syn::Expr::Group(group) => &group.expr,
+            syn::Expr::Paren(paren) => &paren.expr,
+            _ => return expression,
+        };
+    }
+}
+
+fn escape_html_literal(input: &str) -> String {
+    let mut escaped = String::with_capacity(input.len());
+    for ch in input.chars() {
+        match ch {
+            '&' => escaped.push_str("&amp;"),
+            '<' => escaped.push_str("&lt;"),
+            '>' => escaped.push_str("&gt;"),
+            '"' => escaped.push_str("&quot;"),
+            '\'' => escaped.push_str("&#39;"),
+            _ => escaped.push(ch),
+        }
+    }
+    escaped
 }
 
 fn is_component_tag(name: &NodeName) -> bool {
@@ -752,11 +923,12 @@ fn walk_nodes<'a>(
         context_binding,
         empty_elements,
         name_counter: Rc::new(Cell::new(0)),
+        literal_buffer: String::new(),
         output: WalkNodesOutput::default(),
     };
     let mut nodes = nodes.to_vec();
     let output = visit_nodes(&mut nodes, visitor);
-    output.output
+    output.into_output()
 }
 
 fn trailing_garbage_diagnostics(nodes: &[Node]) -> Vec<proc_macro2::TokenStream> {
@@ -889,7 +1061,10 @@ pub(crate) fn html_ctxner(
 
 #[cfg(test)]
 mod tests {
-    use super::{component_paths, is_component_tag, parse_component_props};
+    use super::{
+        compile_time_attr_string_literal, component_paths, escape_html_literal, is_component_tag,
+        parse_component_props,
+    };
     use quote::ToTokens;
     use rstml::{Parser, ParserConfig, node::Node};
 
@@ -1052,5 +1227,23 @@ mod tests {
         let duplicate_key_span = parsed.props[0].key_span;
         assert_eq!(parsed.props[0].key, "role");
         assert_eq!(duplicate_key_span.start().line, 1);
+    }
+
+    #[test]
+    fn escapes_compile_time_attr_string_literal() {
+        let expression: syn::Expr = syn::parse_quote!("Tom & Jerry < \"best\"");
+        let rendered = compile_time_attr_string_literal(&expression).expect("string literal");
+        assert_eq!(rendered, "Tom &amp; Jerry &lt; &quot;best&quot;");
+    }
+
+    #[test]
+    fn compile_time_attr_string_literal_ignores_non_string_literals() {
+        let expression: syn::Expr = syn::parse_quote!(123);
+        assert!(compile_time_attr_string_literal(&expression).is_none());
+    }
+
+    #[test]
+    fn escape_html_literal_matches_runtime_contract() {
+        assert_eq!(escape_html_literal("<>&\"'"), "&lt;&gt;&amp;&quot;&#39;");
     }
 }

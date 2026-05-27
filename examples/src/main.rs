@@ -3,8 +3,12 @@ use freshed_rs_runtime::{CollectHtmlFragmentExt, RenderResult};
 use std::fmt::Write;
 
 fn main() {
-    println!("Hello, world!");
     let s = html_to_string!(<div>a</div>).unwrap();
+    println!("{}", s);
+    let s = html_to_string!(<div><input type="password"></div>).unwrap();
+    println!("{}", s);
+    let s =
+        html_to_string!(<sample-webcomponent random="1" attr2={s}>a</sample-webcomponent>).unwrap();
     println!("{}", s);
     let b = html_to_string!(<Badge tone={"good"} count={Some(20)} />).unwrap();
     println!("{}", b);

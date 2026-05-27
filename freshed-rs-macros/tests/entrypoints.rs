@@ -1,4 +1,6 @@
-use freshed_rs_macros::{component, html, html_async, html_async_ctx, html_ctx, with_children};
+use freshed_rs_macros::{
+    component, html, html_async, html_async_ctx, html_ctx, html_try, with_children,
+};
 use freshed_rs_runtime::{CollectHtmlFragmentExt, RawHtml, RenderResult};
 use futures::executor::block_on;
 
@@ -160,4 +162,13 @@ fn collect_html_sequence_supports_iterator_composition() {
 
     html!(&mut out, <ul>{items}</ul>).expect("list rendering should succeed");
     assert_eq!(out, "<ul><li>0</li><li>1</li><li>2</li><li>3</li></ul>");
+}
+
+#[test]
+fn html_try_returns_result_fragment() {
+    let item = html_try!(<li>{42}</li>).expect("fragment render should succeed");
+
+    let mut out = String::new();
+    html!(&mut out, <ul>{item}</ul>).expect("fragment interpolation should succeed");
+    assert_eq!(out, "<ul><li>42</li></ul>");
 }

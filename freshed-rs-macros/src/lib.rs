@@ -332,8 +332,11 @@ pub fn html(tokens: TokenStream) -> TokenStream {
     }
 
     let builder_ident = format_ident!("__fr_fragment_builder");
-    let html_tokens: proc_macro2::TokenStream =
-        to_html::compile(quote!(&mut #builder_ident, #input_tokens).into(), MacroMode::Html).into();
+    let html_tokens: proc_macro2::TokenStream = to_html::compile(
+        quote!(&mut #builder_ident, #input_tokens).into(),
+        MacroMode::Html,
+    )
+    .into();
 
     quote! {
         {
@@ -344,6 +347,45 @@ pub fn html(tokens: TokenStream) -> TokenStream {
                 Err(__fr_err) => {
                     panic!("html! fragment rendering failed: {:?}", __fr_err);
                 }
+            }
+        }
+    }
+    .into()
+}
+
+#[proc_macro]
+pub fn html_try(tokens: TokenStream) -> TokenStream {
+    let input_tokens: proc_macro2::TokenStream = tokens.into();
+    let parse_result = syn::parse2::<HtmlInvocationShape>(input_tokens.clone());
+
+    if let Ok(shape) = parse_result {
+        if shape.has_writer_prefix {
+            return syn::Error::new_spanned(
+                input_tokens,
+                "html_try! expects markup only, e.g. html_try!(<li>{value}</li>)",
+            )
+            .to_compile_error()
+            .into();
+        }
+    }
+
+    let builder_ident = format_ident!("__fr_fragment_builder");
+    let html_tokens: proc_macro2::TokenStream = to_html::compile(
+        quote!(&mut #builder_ident, #input_tokens).into(),
+        MacroMode::Html,
+    )
+    .into();
+
+    quote! {
+        {
+            let mut #builder_ident = ::freshed_rs_runtime::FragmentBuilder::new();
+            let __fr_render_result = #html_tokens;
+            match __fr_render_result {
+                Ok(()) => ::core::result::Result::<
+                    ::freshed_rs_runtime::HtmlFragment,
+                    ::freshed_rs_runtime::RenderError,
+                >::Ok(#builder_ident.finish()),
+                Err(__fr_err) => ::core::result::Result::Err(__fr_err),
             }
         }
     }

@@ -44,8 +44,10 @@ pub fn Looper(output: &mut impl Write, props: LooperProps) -> RenderResult {
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::Write;
+
     use crate::{Looper, LooperProps};
-    use freshed_rs_macros::html;
+    use freshed_rs_macros::{html, html_to_string, rsx_component};
     use freshed_rs_runtime::RenderResult;
 
     #[test]
@@ -110,5 +112,30 @@ mod tests {
             out,
             "<ul><li id=\"li-00\">0</li><li id=\"li-01\">1</li><li id=\"li-02\">2</li></ul>"
         );
+    }
+
+    #[derive(Default)]
+    pub struct BodyProps;
+
+    #[rsx_component]
+    fn Body(output: &mut impl Write, _props: BodyProps) -> RenderResult {
+        html!(output, <body><p>hello there</p></body>)
+    }
+
+    #[test]
+    fn test_doc_outline() {
+        let s = html_to_string!(<!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <script type="module" src="https://unpkg.com/@fluentui/web-components@beta"></script>
+            </head>
+            <Body />
+            </html>
+        ).unwrap();
+        assert_eq!(
+            s,
+            r#"<!DOCTYPE html><html lang="en"><head><script type="module" src="https://unpkg.com/@fluentui/web-components@beta"></script></head><body><p>hello there</p></body></html>"#
+        );
+        println!("{}", s);
     }
 }

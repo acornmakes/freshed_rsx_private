@@ -318,9 +318,37 @@ pub fn rsx_component(attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
-/*
-    the html macro to rule them all
-*/
+/// Renders RSX-style markup into HTML.
+///
+/// This macro supports two invocation shapes:
+///
+/// - Fragment mode: returns `::freshed_rs_runtime::HtmlFragment`
+/// - Writer mode: writes directly into a writer and returns `RenderResult`
+///
+/// Dynamic values are HTML-escaped by default.
+///
+/// # Fragment Mode
+///
+/// ```ignore
+/// use freshed_rs_macros::html;
+///
+/// let fragment = html!(<div class="card">{"hello"}</div>);
+/// ```
+///
+/// # Writer Mode
+///
+/// ```ignore
+/// use freshed_rs_macros::html;
+///
+/// let mut out = String::new();
+/// html!(&mut out, <p id={format!("p-{}", 1)}>"ok"</p>)?;
+/// ```
+///
+/// # Notes
+///
+/// - Intrinsic tags are lower-case (for example `div`, `span`, `my-widget`).
+/// - Uppercase tags are treated as component calls.
+/// - Self-closing void elements (for example `input`, `br`) are emitted without children.
 pub fn html(tokens: TokenStream) -> TokenStream {
     let input_tokens: proc_macro2::TokenStream = tokens.into();
     let parse_result = syn::parse2::<HtmlInvocationShape>(input_tokens.clone());
@@ -354,6 +382,21 @@ pub fn html(tokens: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
+/// Renders markup into a `Result<HtmlFragment, RenderError>`.
+///
+/// This is the fallible fragment variant of `html!`.
+///
+/// # Example
+///
+/// ```ignore
+/// use freshed_rs_macros::html_try;
+///
+/// let fragment = html_try!(<li>{"item"}</li>)?;
+/// ```
+///
+/// # Input Shape
+///
+/// Accepts markup only. Writer-prefixed invocation is rejected.
 pub fn html_try(tokens: TokenStream) -> TokenStream {
     let input_tokens: proc_macro2::TokenStream = tokens.into();
     let parse_result = syn::parse2::<HtmlInvocationShape>(input_tokens.clone());
@@ -393,6 +436,17 @@ pub fn html_try(tokens: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
+/// Renders markup and returns a `Result<String, RenderError>`.
+///
+/// This is convenient for direct string rendering in tests or examples.
+///
+/// # Example
+///
+/// ```ignore
+/// use freshed_rs_macros::html_to_string;
+///
+/// let html = html_to_string!(<div id="root">{"ok"}</div>)?;
+/// ```
 pub fn html_to_string(tokens: TokenStream) -> TokenStream {
     let markup_tokens: proc_macro2::TokenStream = tokens.into();
     let buffer_ident = format_ident!("__fr_rendered_html");
@@ -416,11 +470,37 @@ pub fn html_to_string(tokens: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
+/// Async variant of `html!`.
+///
+/// Expands to an async rendering expression that supports intrinsic markup and
+/// async component calls.
+///
+/// # Example
+///
+/// ```ignore
+/// use freshed_rs_macros::html_async;
+///
+/// # async fn run() -> Result<(), freshed_rs_runtime::RenderError> {
+/// let mut out = String::new();
+/// html_async!(&mut out, <div>{"hello"}</div>).await?;
+/// # Ok(()) }
+/// ```
 pub fn html_async(tokens: TokenStream) -> TokenStream {
     to_html::compile(tokens, MacroMode::HtmlAsync)
 }
 
 #[proc_macro]
+/// Async-like convenience variant that returns a `Result<String, RenderError>`.
+///
+/// This macro renders markup into an owned `String`.
+///
+/// # Example
+///
+/// ```ignore
+/// use freshed_rs_macros::html_async_to_string;
+///
+/// let html = html_async_to_string!(<section>{"ok"}</section>)?;
+/// ```
 pub fn html_async_to_string(tokens: TokenStream) -> TokenStream {
     let markup_tokens: proc_macro2::TokenStream = tokens.into();
     let buffer_ident = format_ident!("__fr_rendered_html");
@@ -444,11 +524,46 @@ pub fn html_async_to_string(tokens: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
+/// Context-aware variant of `html!`.
+///
+/// Expected input shape:
+///
+/// - `writer_expr, context_expr, <markup...>`
+///
+/// The context expression is evaluated once and threaded into component calls
+/// that accept `(writer, ctx, props)` signatures.
+///
+/// # Example
+///
+/// ```ignore
+/// use freshed_rs_macros::html_ctx;
+///
+/// let mut out = String::new();
+/// html_ctx!(&mut out, app_ctx, <AppShell title={"home"} />)?;
+/// ```
 pub fn html_ctx(tokens: TokenStream) -> TokenStream {
     to_html::compile(tokens, MacroMode::HtmlContext)
 }
 
 #[proc_macro]
+/// Async context-aware variant of `html!`.
+///
+/// Expected input shape:
+///
+/// - `writer_expr, context_expr, <markup...>`
+///
+/// Supports async component invocation in context-aware rendering.
+///
+/// # Example
+///
+/// ```ignore
+/// use freshed_rs_macros::html_async_ctx;
+///
+/// # async fn run() -> Result<(), freshed_rs_runtime::RenderError> {
+/// let mut out = String::new();
+/// html_async_ctx!(&mut out, app_ctx, <Dashboard async />).await?;
+/// # Ok(()) }
+/// ```
 pub fn html_async_ctx(tokens: TokenStream) -> TokenStream {
     to_html::compile(tokens, MacroMode::HtmlAsyncContext)
 }

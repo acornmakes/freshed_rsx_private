@@ -228,8 +228,8 @@ Files:
 Tasks:
 
 - [x] 11.1 Remove the separate IDE helper macro and keep shared HTML behavior in `html!`.
-- [ ] 11.2 Ensure component-related diagnostics include tag/prop names.
-- [ ] 11.3 Ensure all macro-owned diagnostics use source spans from original syntax.
+- [x] 11.2 Ensure component-related diagnostics include tag/prop names.
+- [x] 11.3 Ensure all macro-owned diagnostics use source spans from original syntax.
 - [ ] 11.4 Add diagnostics for malformed context macro invocations.
 
 Exit criteria:

@@ -39,10 +39,6 @@ pub fn Looper(output: &mut impl Write, props: LooperProps) -> RenderResult {
     let items = (0..props.count)
         .map(|n| html!(<li id={format!("li-{:02}",n)}>{n}</li>))
         .into_html_iter();
-    // let it_items = html_each(items);
-    // let items = (0..props.count)
-    //     .map(|n| html!(<li id={format!("li-{:02}",n)}>{n}</li>))
-    //     .collect_html_sequence();
     html!(output, <ul>{
         if props.count == 0 {
             html!(<li>None</li>)

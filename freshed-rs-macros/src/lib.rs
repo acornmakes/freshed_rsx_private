@@ -135,7 +135,7 @@ pub fn with_children(attr: TokenStream, item: TokenStream) -> TokenStream {
             mutability: syn::FieldMutability::None,
             ident: Some(syn::Ident::new("children", proc_macro2::Span::call_site())),
             colon_token: Some(Default::default()),
-            ty: syn::parse_quote!(::std::string::String),
+            ty: syn::parse_quote!(::freshed_rs_runtime::Children),
         });
     }
 

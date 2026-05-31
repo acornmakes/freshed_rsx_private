@@ -298,6 +298,7 @@ where
             if !parsed_props.has_children_prop && !element.children.is_empty() {
                 let children_ident = self.next_ident("children");
                 let children_writer_ident = self.next_ident("children_out");
+                let children_builder_ident = self.next_ident("children_builder");
 
                 let child_visitor = self.child_output(children_writer_ident.clone());
                 let child_output = visit_nodes(&mut element.children, child_visitor);
@@ -310,15 +311,26 @@ where
                 self.output
                     .component_symbol_hints
                     .extend(component_symbol_hints);
-                self.push_statement(quote! {
-                    let mut #children_ident = ::std::string::String::new();
-                    {
-                        let #children_writer_ident = &mut #children_ident;
-                        #(#child_statements)*
-                    }
-                });
+                if let Some(static_children) =
+                    collapse_static_literal_writes(&child_statements, &children_writer_ident)
+                {
+                    self.push_statement(quote! {
+                        let #children_ident: ::freshed_rs_runtime::Children =
+                            ::freshed_rs_runtime::Children::from_static(#static_children);
+                    });
+                } else {
+                    self.push_statement(quote! {
+                        let mut #children_builder_ident = ::freshed_rs_runtime::FragmentBuilder::new();
+                        {
+                            let #children_writer_ident = &mut #children_builder_ident;
+                            #(#child_statements)*
+                        }
+                        let #children_ident: ::freshed_rs_runtime::Children =
+                            ::freshed_rs_runtime::Children::from_fragment(#children_builder_ident.finish());
+                    });
+                }
                 props_fields.push(
-                    quote_spanned!(element.open_tag.name.span() => children: #children_ident),
+                    quote_spanned!(element.open_tag.name.span() => children: ::core::convert::Into::into(#children_ident)),
                 );
             }
 
@@ -559,6 +571,24 @@ fn parse_literal_write_statement(
     };
 
     Some((writer_expr, literal))
+}
+
+fn collapse_static_literal_writes(
+    statements: &[proc_macro2::TokenStream],
+    writer_ident: &syn::Ident,
+) -> Option<String> {
+    let mut out = String::new();
+    let expected_writer = writer_ident.to_token_stream().to_string();
+
+    for statement in statements {
+        let (writer, literal) = parse_literal_write_statement(statement)?;
+        if writer.to_string() != expected_writer {
+            return None;
+        }
+        out.push_str(&literal);
+    }
+
+    Some(out)
 }
 
 fn compile_time_attr_string_literal(value: &impl ToTokens) -> Option<String> {

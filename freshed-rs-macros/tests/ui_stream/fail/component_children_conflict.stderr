@@ -8,9 +8,9 @@ error[E0308]: mismatched types
   --> tests/ui_stream/fail/component_children_conflict.rs:16:46
    |
 16 |     let _ = html!(&mut out, <Panel children={text}>{"body"}</Panel>);
-   |                                              ^^^^ expected `String`, found `&str`
+   |                                              ^^^^ expected `Children`, found `&str`
    |
-help: try using a conversion method
+help: call `Into::into` on this expression to convert `&str` into `Children`
    |
-16 |     let _ = html!(&mut out, <Panel children={text.to_string()}>{"body"}</Panel>);
-   |                                                  ++++++++++++
+16 |     let _ = html!(&mut out, <Panel children={text.into()}>{"body"}</Panel>);
+   |                                                  +++++++

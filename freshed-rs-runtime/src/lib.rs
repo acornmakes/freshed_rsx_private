@@ -177,6 +177,35 @@ impl Default for HtmlFragment {
     }
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct Children {
+    fragment: HtmlFragment,
+}
+
+impl Children {
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    pub fn from_fragment(fragment: HtmlFragment) -> Self {
+        Self { fragment }
+    }
+
+    pub fn from_static(fragment: &'static str) -> Self {
+        Self {
+            fragment: HtmlFragment::from_raw(fragment),
+        }
+    }
+
+    pub fn render_to<W: Write + ?Sized>(&self, out: &mut W) -> RenderResult {
+        self.fragment.render_to(out)
+    }
+
+    pub fn into_fragment(self) -> HtmlFragment {
+        self.fragment
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct FragmentBuilder {
     chunks: Vec<FragmentChunk>,
@@ -348,6 +377,18 @@ impl HtmlValue for &HtmlSequence {
     }
 }
 
+impl HtmlValue for Children {
+    fn write_html<W: Write + ?Sized>(self, out: &mut W) -> RenderResult {
+        self.fragment.render_to(out)
+    }
+}
+
+impl HtmlValue for &Children {
+    fn write_html<W: Write + ?Sized>(self, out: &mut W) -> RenderResult {
+        self.fragment.render_to(out)
+    }
+}
+
 impl From<RawHtml> for HtmlFragment {
     fn from(value: RawHtml) -> Self {
         HtmlFragment::from_chunks(vec![FragmentChunk::Raw(value.into_inner())])
@@ -365,6 +406,36 @@ impl From<String> for HtmlFragment {
 impl From<&str> for HtmlFragment {
     fn from(value: &str) -> Self {
         HtmlFragment::from_chunks(vec![FragmentChunk::Escaped(TextStorage::from_str(value))])
+    }
+}
+
+impl From<HtmlFragment> for Children {
+    fn from(value: HtmlFragment) -> Self {
+        Self::from_fragment(value)
+    }
+}
+
+impl From<String> for Children {
+    fn from(value: String) -> Self {
+        Self::from_fragment(HtmlFragment::from(value))
+    }
+}
+
+impl From<&str> for Children {
+    fn from(value: &str) -> Self {
+        Self::from_fragment(HtmlFragment::from(value))
+    }
+}
+
+impl From<RawHtml> for Children {
+    fn from(value: RawHtml) -> Self {
+        Self::from_fragment(HtmlFragment::from(value))
+    }
+}
+
+impl From<Children> for String {
+    fn from(value: Children) -> Self {
+        value.into_fragment().into_inner()
     }
 }
 

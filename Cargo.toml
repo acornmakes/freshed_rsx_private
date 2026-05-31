@@ -6,7 +6,7 @@ edition = "2024"
 
 [workspace]
 resolver="2"
-members=["freshed-rs-macros", "freshed-rs-runtime", "examples"]
+members=["freshed-rs-macros", "freshed-rs-runtime", "freshed-rs-axum", "freshed-rs-actix", "examples"]
 
 [workspace.dependencies]
 rstml = "0.12.1"
@@ -17,3 +17,8 @@ quote = "1.0.45"
 freshed-rs-macros = { path ="freshed-rs-macros" }
 freshed-rs-runtime = { path ="freshed-rs-runtime" }
 syn_derive = "0.2.0"
+axum = "0.7.9"
+actix-web = "4.12.0"
+tokio = { version = "1.48.0", features = ["rt", "sync", "macros"] }
+tokio-stream = "0.1.17"
+tower = "0.5.2"

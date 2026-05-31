@@ -1,5 +1,5 @@
 use freshed_rs_macros::{html, html_to_string, rsx_component, with_children};
-use freshed_rs_runtime::{CollectHtmlFragmentExt, RenderResult};
+use freshed_rs_runtime::{RenderResult, ToHtmlIter};
 use std::fmt::Write;
 
 fn main() {
@@ -38,7 +38,11 @@ pub struct LooperProps {
 pub fn Looper(output: &mut impl Write, props: LooperProps) -> RenderResult {
     let items = (0..props.count)
         .map(|n| html!(<li id={format!("li-{:02}",n)}>{n}</li>))
-        .collect_html_sequence();
+        .into_html_iter();
+    // let it_items = html_each(items);
+    // let items = (0..props.count)
+    //     .map(|n| html!(<li id={format!("li-{:02}",n)}>{n}</li>))
+    //     .collect_html_sequence();
     html!(output, <ul>{
         if props.count == 0 {
             html!(<li>None</li>)

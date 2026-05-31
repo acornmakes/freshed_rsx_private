@@ -2,6 +2,7 @@
 // - preserve intrinsic html! behavior via regression snapshots
 // - keep compile-fail harness in place for future diagnostic tests
 // - route generated symbol naming through the __fr_* convention
+
 mod to_html;
 
 use proc_macro::TokenStream;

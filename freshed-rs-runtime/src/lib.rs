@@ -2,6 +2,10 @@ use std::fmt::{self, Display, Write};
 
 const INLINE_TEXT_CAPACITY: usize = 48;
 
+mod iter;
+
+pub use iter::{HtmlWriterIter, ToHtmlIter, html_each};
+
 pub type RenderResult = Result<(), RenderError>;
 
 #[derive(Debug)]
@@ -264,23 +268,23 @@ impl HtmlSequence {
     }
 }
 
-pub trait CollectHtmlFragmentExt: Iterator + Sized {
-    fn collect_html(self) -> HtmlSequence
-    where
-        Self::Item: Into<HtmlFragment>,
-    {
-        HtmlSequence::new(self.map(Into::into).collect())
-    }
+// pub trait CollectHtmlFragmentExt: Iterator + Sized {
+//     fn collect_html(self) -> HtmlSequence
+//     where
+//         Self::Item: Into<HtmlFragment>,
+//     {
+//         HtmlSequence::new(self.map(Into::into).collect())
+//     }
 
-    fn collect_html_sequence(self) -> HtmlSequence
-    where
-        Self::Item: Into<HtmlFragment>,
-    {
-        self.collect_html()
-    }
-}
+//     fn collect_html_sequence(self) -> HtmlSequence
+//     where
+//         Self::Item: Into<HtmlFragment>,
+//     {
+//         self.collect_html()
+//     }
+// }
 
-impl<I: Iterator> CollectHtmlFragmentExt for I {}
+// impl<I: Iterator> CollectHtmlFragmentExt for I {}
 
 pub trait HtmlValue {
     fn write_html<W: Write + ?Sized>(self, out: &mut W) -> RenderResult;
@@ -407,8 +411,8 @@ mod tests {
     use std::fmt::Write;
 
     use super::{
-        CollectHtmlFragmentExt, FragmentBuilder, FragmentChunk, HtmlFragment, HtmlSequence,
-        INLINE_TEXT_CAPACITY, RawHtml, TextStorage, escape_html, write_attr, write_text,
+        FragmentBuilder, FragmentChunk, HtmlFragment, HtmlSequence, INLINE_TEXT_CAPACITY, RawHtml,
+        TextStorage, escape_html, write_attr, write_text,
     };
 
     #[test]
@@ -455,20 +459,6 @@ mod tests {
         let mut out = String::new();
         write_text(&mut out, sequence).expect("write_text should succeed");
         assert_eq!(out, "<li>0</li><li>1</li>");
-    }
-
-    #[test]
-    fn collect_html_sequence_gathers_iterator_items() {
-        let seq = (0..3)
-            .map(|i| HtmlFragment::from_raw(format!("<li>{i}</li>")))
-            .collect_html_sequence();
-
-        assert_eq!(seq.len(), 3);
-        assert!(!seq.is_empty());
-
-        let mut out = String::new();
-        write_text(&mut out, seq).expect("write_text should succeed");
-        assert_eq!(out, "<li>0</li><li>1</li><li>2</li>");
     }
 
     #[test]

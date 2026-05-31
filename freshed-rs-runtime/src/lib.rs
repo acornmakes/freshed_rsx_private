@@ -6,8 +6,10 @@ use std::{
 const INLINE_TEXT_CAPACITY: usize = 48;
 
 mod iter;
+mod name_guard;
 
 pub use iter::{HtmlWriterIter, ToHtmlIter, html_each};
+pub use name_guard::NameGuard;
 
 pub type RenderResult = Result<(), RenderError>;
 
@@ -412,9 +414,9 @@ pub fn escape_html(input: &str) -> String {
 static ID_GENERATOR: AtomicUsize = AtomicUsize::new(0);
 
 /// Give me an ID, starts at 0 and increases
-pub fn next_id() -> String {
+pub fn next_id_to_string() -> String {
     let id = ID_GENERATOR.fetch_add(1, Ordering::SeqCst);
-    format!("i{}", id)
+    format!("{id}")
 }
 
 #[derive(Default)]
@@ -431,26 +433,23 @@ impl<'s> IdGenerator<'s> {
         }
     }
 
-    pub fn new_from(prefix: &'s str, starts_with: usize) -> Self {
+    pub fn new_starting_at(prefix: &'s str, starts_at: usize) -> Self {
         IdGenerator {
-            val: AtomicUsize::new(starts_with),
+            val: AtomicUsize::new(starts_at),
             prefix,
         }
     }
 
-    pub fn next(&self) -> usize {
-        self.val.fetch_add(1, Ordering::Relaxed)
+    fn next(&self) -> usize {
+        self.val.fetch_add(1, Ordering::SeqCst)
     }
 
     pub fn next_id(&self) -> String {
-        let id = self.next();
-        let prefix = self.prefix;
-        format!("{prefix}{id}")
+        format!("{}{}", self.prefix, self.next())
     }
 
     pub fn next_id_prefix(&self, prefix: &str) -> String {
-        let id = self.next();
-        format!("{prefix}{id}")
+        format!("{prefix}{}", self.next())
     }
 }
 
@@ -467,7 +466,7 @@ mod tests {
 
     #[test]
     fn id_counter_test() {
-        let id_gen = IdGenerator::new_from("id", 1);
+        let id_gen = IdGenerator::new_starting_at("id", 1);
         assert_eq!(id_gen.next_id(), format!("id1"));
 
         assert_eq!(id_gen.next_id_prefix("cheese"), format!("cheese2"));

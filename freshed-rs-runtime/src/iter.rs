@@ -18,6 +18,7 @@ where
     I: Iterator,
     I::Item: Into<HtmlFragment>,
 {
+    // this is called because it's an HtmlValue (which is called by HtmlValue::write_text)
     fn write_html<W: std::fmt::Write + ?Sized>(mut self, out: &mut W) -> RenderResult {
         for item in self.iter.by_ref() {
             let fragment: HtmlFragment = item.into();

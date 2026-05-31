@@ -1,5 +1,5 @@
 use freshed_rs_macros::{html, html_to_string, rsx_component, with_children};
-use freshed_rs_runtime::{RenderResult, ToHtmlIter};
+use freshed_rs_runtime::{IdGenerator, RenderResult, ToHtmlIter};
 use std::fmt::Write;
 
 fn main() {
@@ -36,8 +36,9 @@ pub struct LooperProps {
 }
 #[rsx_component]
 pub fn Looper(output: &mut impl Write, props: LooperProps) -> RenderResult {
+    let id_counter = IdGenerator::new("li");
     let items = (0..props.count)
-        .map(|n| html!(<li id={format!("li-{:02}",n)}>{n}</li>))
+        .map(|n| html!(<li id={id_counter.next_id() }>{n}</li>))
         .into_html_iter();
     html!(output, <ul>{
         if props.count == 0 {

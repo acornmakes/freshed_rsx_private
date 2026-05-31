@@ -1,4 +1,7 @@
-use std::fmt::{self, Display, Write};
+use std::{
+    fmt::{self, Display, Write},
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 const INLINE_TEXT_CAPACITY: usize = 48;
 
@@ -406,14 +409,78 @@ pub fn escape_html(input: &str) -> String {
     escaped
 }
 
+static ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+/// Give me an ID, starts at 0 and increases
+pub fn next_id() -> String {
+    let id = ID_COUNTER.fetch_add(1, Ordering::SeqCst);
+    format!("i{}", id)
+}
+
+#[derive(Default)]
+pub struct IdGenerator<'s> {
+    val: AtomicUsize,
+    prefix: &'s str,
+}
+
+impl<'s> IdGenerator<'s> {
+    pub fn new(prefix: &'s str) -> Self {
+        IdGenerator {
+            val: AtomicUsize::default(),
+            prefix: prefix,
+        }
+    }
+
+    pub fn new_from(starts_with: usize) -> Self {
+        IdGenerator {
+            val: AtomicUsize::new(starts_with),
+            prefix: "id",
+        }
+    }
+
+    pub fn next(&self) -> usize {
+        let id = self.val.fetch_add(1, Ordering::Relaxed);
+        id
+    }
+
+    pub fn next_id(&self) -> String {
+        let id = self.next();
+        let prefix = self.prefix;
+        format!("{prefix}{id}")
+    }
+
+    pub fn next_id_prefix(&self, prefix: &str) -> String {
+        let id = self.next();
+        format!("{prefix}{id}")
+    }
+}
+
+impl From<IdGenerator<'_>> for String {
+    fn from(value: IdGenerator) -> Self {
+        let v = value.next_id();
+        v
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::fmt::Write;
+
+    use crate::IdGenerator;
 
     use super::{
         FragmentBuilder, FragmentChunk, HtmlFragment, HtmlSequence, INLINE_TEXT_CAPACITY, RawHtml,
         TextStorage, escape_html, write_attr, write_text,
     };
+
+    #[test]
+    fn id_counter_test() {
+        let id_counter = IdGenerator::new_from(1);
+        assert_eq!(id_counter.next_id(), format!("id1"));
+
+        assert_eq!(id_counter.next_id_prefix("cheese"), format!("cheese2"));
+        assert_eq!(Into::<String>::into(id_counter), format!("id3"));
+    }
 
     #[test]
     fn escapes_html_metacharacters() {

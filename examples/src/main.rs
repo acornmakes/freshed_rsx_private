@@ -117,7 +117,7 @@ mod tests {
         html!(&mut out, <Looper count={3} />).expect("render should succeed");
         assert_eq!(
             out,
-            "<ul><li id=\"li-00\">0</li><li id=\"li-01\">1</li><li id=\"li-02\">2</li></ul>"
+            "<ul><li id=\"li0\">0</li><li id=\"li1\">1</li><li id=\"li2\">2</li></ul>"
         );
     }
 

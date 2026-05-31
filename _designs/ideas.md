@@ -10,14 +10,14 @@ Freshed should position itself as:
 
 Non-goal to keep explicit: do not become a client-side framework or VDOM runtime.
 
-## Highest-Value Features for Axum and Actix Users
+## Highest-Value Features for Axum Users
 
 ## 1) First-Class Framework Adapters (Priority: P0)
 
 Add dedicated integration crates:
 
 - `freshed-rs-axum`
-- `freshed-rs-actix`
+
 
 Core features:
 
@@ -31,10 +31,6 @@ Axum-specific:
 - `FromRequestParts` extraction helpers for render context.
 - `tower::Layer` integration for request metadata injection (request id, auth user, locale, feature flags).
 
-Actix-specific:
-
-- Extractor and middleware helpers for `HttpRequest`-scoped render context.
-- `Responder` helpers for full-page, partial, and chunked HTML responses.
 
 ## 2) True Streaming HTML Responses (Priority: P0)
 
@@ -49,26 +45,6 @@ Why this matters:
 - Better TTFB for dynamic pages.
 - Lower peak memory for large lists/tables.
 - Closer to the developer experience people like in modern Node SSR streaming.
-
-## 3) Request Context and Dependency Injection Story (Priority: P0)
-
-Standardize the `ctx` pattern for web apps:
-
-- A recommended `RenderContext` shape and trait-based extension points.
-- Context composition helpers for db, session, user, locale, csrf nonce, csp nonce.
-- Per-request context propagation from middleware to components with zero global state.
-
-This should be documented as a first-class pattern, not just an advanced option.
-
-## 4) Fragment and Partial Rendering for HTMX/Turbo (Priority: P1)
-
-Web teams often need partial HTML responses, not only full pages:
-
-- Explicit partial-render API (`render_fragment`) with shared layout context.
-- Helpers for out-of-band swaps and progressive enhancement workflows.
-- Stable conventions for returning either full page or partial depending on headers.
-
-This is a major practical differentiator for Rust SSR adoption.
 
 ## Macro and Runtime Optimizations
 

@@ -1,26 +1,21 @@
+use std::borrow::Cow;
 use std::sync::atomic::AtomicUsize;
 
-pub enum NameGuard<'s> {
-    Str(&'s str),
-    Dyn(String),
-}
+pub struct NameGuard<'s>(Cow<'s, str>);
 
 static NAME_GUARD_NUM: AtomicUsize = AtomicUsize::new(0);
 
 impl<'s> NameGuard<'s> {
     pub fn new(name: &'s str) -> Self {
-        Self::Str(name)
+        Self(Cow::Borrowed(name))
     }
 
     pub fn unique() -> Self {
         let num = NAME_GUARD_NUM.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        Self::Dyn(format!("ng_{num}"))
+        Self(Cow::Owned(format!("ng_{num}")))
     }
 
-    pub fn get(&'s self) -> &'s str {
-        match self {
-            Self::Str(s) => s,
-            Self::Dyn(s) => s,
-        }
+    pub fn get(&self) -> &str {
+        self.0.as_ref()
     }
 }

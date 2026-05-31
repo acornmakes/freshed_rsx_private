@@ -36,9 +36,9 @@ pub struct LooperProps {
 }
 #[rsx_component]
 pub fn Looper(output: &mut impl Write, props: LooperProps) -> RenderResult {
-    let id_counter = IdGenerator::new("li");
+    let id_gen = IdGenerator::new("li");
     let items = (0..props.count)
-        .map(|n| html!(<li id={id_counter.next_id() }>{n}</li>))
+        .map(|n| html!(<li id={id_gen.next_id() }>{n}</li>))
         .into_html_iter();
     html!(output, <ul>{
         if props.count == 0 {

@@ -409,11 +409,11 @@ pub fn escape_html(input: &str) -> String {
     escaped
 }
 
-static ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
+static ID_GENERATOR: AtomicUsize = AtomicUsize::new(0);
 
 /// Give me an ID, starts at 0 and increases
 pub fn next_id() -> String {
-    let id = ID_COUNTER.fetch_add(1, Ordering::SeqCst);
+    let id = ID_GENERATOR.fetch_add(1, Ordering::SeqCst);
     format!("i{}", id)
 }
 
@@ -427,20 +427,19 @@ impl<'s> IdGenerator<'s> {
     pub fn new(prefix: &'s str) -> Self {
         IdGenerator {
             val: AtomicUsize::default(),
-            prefix: prefix,
+            prefix,
         }
     }
 
-    pub fn new_from(starts_with: usize) -> Self {
+    pub fn new_from(prefix: &'s str, starts_with: usize) -> Self {
         IdGenerator {
             val: AtomicUsize::new(starts_with),
-            prefix: "id",
+            prefix,
         }
     }
 
     pub fn next(&self) -> usize {
-        let id = self.val.fetch_add(1, Ordering::Relaxed);
-        id
+        self.val.fetch_add(1, Ordering::Relaxed)
     }
 
     pub fn next_id(&self) -> String {
@@ -452,13 +451,6 @@ impl<'s> IdGenerator<'s> {
     pub fn next_id_prefix(&self, prefix: &str) -> String {
         let id = self.next();
         format!("{prefix}{id}")
-    }
-}
-
-impl From<IdGenerator<'_>> for String {
-    fn from(value: IdGenerator) -> Self {
-        let v = value.next_id();
-        v
     }
 }
 
@@ -475,11 +467,13 @@ mod tests {
 
     #[test]
     fn id_counter_test() {
-        let id_counter = IdGenerator::new_from(1);
-        assert_eq!(id_counter.next_id(), format!("id1"));
+        let id_gen = IdGenerator::new_from("id", 1);
+        assert_eq!(id_gen.next_id(), format!("id1"));
 
-        assert_eq!(id_counter.next_id_prefix("cheese"), format!("cheese2"));
-        assert_eq!(Into::<String>::into(id_counter), format!("id3"));
+        assert_eq!(id_gen.next_id_prefix("cheese"), format!("cheese2"));
+        assert_eq!(id_gen.next_id(), format!("id3"));
+        let id4: String = id_gen.next_id();
+        assert_eq!(id4, format!("id4"));
     }
 
     #[test]
